@@ -96,7 +96,7 @@ def resumen_ejecutivo(datos: dict, detalle: list, alcance: str, filtros: str, ge
     filas = [[_p(c, "celda_cab") for c in ("Unidad", "Total", "Pendientes", "Vencidas", "Alta pend.",
                                            "Sin respuesta", "Concluidas")]]
     for r in datos["por_unidad"]:
-        filas.append([_p(f"{r['unidad'].sigla} · {r['unidad'].nombre}")] +
+        filas.append([_p(r["unidad"].nombre)] +
                      [_p(r[k], "num") for k in ("total", "pendientes", "vencidas", "alta", "sin_respuesta",
                                                 "concluidas")])
     h.append(KeepTogether([Paragraph("Gestiones por unidad", E["h2"]),
@@ -121,7 +121,7 @@ def resumen_ejecutivo(datos: dict, detalle: list, alcance: str, filtros: str, ge
         h.append(Paragraph(escape(filtros), E["sub"]))
     cab = ("Código", "Unidad", "Tipo", "Tarea / asunto", "Instancia", "Responsable", "Inicio", "Límite",
            "Estado", "Alerta", "Resultado")
-    proporciones = (0.07, 0.06, 0.08, 0.2, 0.1, 0.11, 0.055, 0.055, 0.09, 0.065, 0.105)
+    proporciones = (0.07, 0.06, 0.08, 0.185, 0.1, 0.11, 0.055, 0.055, 0.09, 0.08, 0.105)
     filas = [[_p(c, "celda_cab") for c in cab]]
     for i in detalle:
         t = i.t
