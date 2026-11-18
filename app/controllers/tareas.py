@@ -5,12 +5,16 @@ from app.extensions import db
 from app.forms.tareas import AdjuntoForm, FiltroTareasForm, TareaForm
 from app.forms.usuarios import AccionForm
 from app.models import Tarea
+from app.models.catalogo import ESTADO_CONCLUIDO
 from app.models.usuario import ROL_ADMIN
 from app.services import ErrorNegocio, permisos
 from app.services import archivos as srv_archivos
+from app.services import alertas
 from app.services import responsables as srv_resp
+from app.services import resumen
 from app.services import tareas as srv
 from app.utils.decoradores import rol_requerido, solo_lectura
+from app.utils.paginacion import Pagina
 
 bp = Blueprint("tareas", __name__, url_prefix="/tareas")
 
@@ -48,8 +52,8 @@ def _preparar_form(form: TareaForm, tarea: Tarea | None) -> None:
 
 
 # ------------------------------------------------------------------ listado
-@bp.route("")
-def lista():
+def formulario_filtros() -> FiltroTareasForm:
+    """Filtros por GET, con las opciones que el usuario puede ver. Lo usan también las vistas del tablero."""
     filtro = FiltroTareasForm(request.args)
     filtro.cargar_opciones(
         unidades=permisos.unidades_visibles(current_user),
@@ -57,8 +61,14 @@ def lista():
         cargos=srv_resp.cargos_asignables(current_user, current_user.unidad_id) if not current_user.es_invitado else [],
         ve_todo=current_user.ve_todo or current_user.es_invitado,
     )
-    pagina = db.paginate(srv.listar(current_user, filtro.data), page=request.args.get("pagina", 1, type=int),
-                         per_page=current_app.config["TAREAS_POR_PAGINA"], error_out=False)
+    return filtro
+
+
+@bp.route("")
+def lista():
+    filtro = formulario_filtros()
+    infos = resumen.filtrar(resumen.cargar(current_user), filtro.data)
+    pagina = Pagina(infos, request.args.get("pagina", 1, type=int), current_app.config["TAREAS_POR_PAGINA"])
     puede_crear = current_user.ve_todo or (current_user.es_unidad and current_user.unidad_id)
     return render_template("tareas/lista.html", pagina=pagina, filtro=filtro, puede_crear=puede_crear)
 
@@ -114,8 +124,9 @@ def editar(tarea_id: int):
 def detalle(tarea_id: int):
     tarea = _tarea_visible(tarea_id)
     habilitada_por = permisos.consulta_tareas(current_user).filter(Tarea.habilita_a_id == tarea.id).all()
+    abiertas = [h.codigo for h in habilitada_por if h.estado.valor != ESTADO_CONCLUIDO]
     return render_template(
-        "tareas/detalle.html", tarea=tarea, habilitada_por=habilitada_por,
+        "tareas/detalle.html", tarea=tarea, habilitada_por=habilitada_por, info=alertas.info(tarea, bloqueada_por=abiertas),
         puede_editar=permisos.puede_editar_tarea(current_user, tarea),
         ve_adjuntos=permisos.puede_ver_adjuntos(current_user, tarea),
         accion=AccionForm(), form_adjunto=AdjuntoForm(),

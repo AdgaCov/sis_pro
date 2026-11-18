@@ -5,6 +5,7 @@ from wtforms import (BooleanField, DateField, FieldList, Form, FormField, Select
 from wtforms.validators import DataRequired, Length, Optional
 
 from app.models.tarea import MAX_SUBTAREAS, NIVELES_RIESGO
+from app.services.alertas import ALERTAS
 
 OBLIGATORIO = "Campo obligatorio."
 NINGUNO = (0, "—")
@@ -86,7 +87,10 @@ class FiltroTareasForm(Form):
     tipo_id = SelectField("Tipo", coerce=_entero, validate_choice=False)
     estado_id = SelectField("Estado", coerce=_entero, validate_choice=False)
     prioridad_id = SelectField("Prioridad", coerce=_entero, validate_choice=False)
+    instancia_id = SelectField("Instancia", coerce=_entero, validate_choice=False)
+    area_id = SelectField("Área funcional", coerce=_entero, validate_choice=False)
     responsable_id = SelectField("Responsable", coerce=_entero, validate_choice=False)
+    alerta = SelectField("Alerta", validate_choice=False)
     ver_concluidas = BooleanField("Ver concluidas")
 
     def cargar_opciones(self, unidades, catalogos: dict, cargos, ve_todo: bool) -> None:
@@ -95,6 +99,9 @@ class FiltroTareasForm(Form):
         self.tipo_id.choices = [todos] + [(c.id, c.valor) for c in catalogos["tipo"]]
         self.estado_id.choices = [todos] + [(c.id, c.valor) for c in catalogos["estado"]]
         self.prioridad_id.choices = [(0, "Todas")] + [(c.id, c.valor) for c in catalogos["prioridad"]]
+        self.instancia_id.choices = [(0, "Todas")] + [(c.id, c.valor) for c in catalogos["instancia"]]
+        self.area_id.choices = [(0, "Todas")] + [(c.id, c.valor) for c in catalogos["area"]]
+        self.alerta.choices = [("", "Todas")] + [(a, a) for a in ALERTAS]
         self.responsable_id.choices = [todos] + [
             (c.id, (f"{c.unidad.sigla} · " if ve_todo else "") + c.nombre) for c in cargos
         ]

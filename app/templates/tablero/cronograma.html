@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import filtros, enlace_tarea %}
+{% block titulo %}Cronograma{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% macro lineas() %}{% for m in datos.meses %}<div class="g-linea" style="left: {{ m.pct }}%"></div>{% endfor %}<div class="g-hoy" style="left: {{ datos.hoy }}%"></div>{% endmacro %}
+{% block contenido %}
+<h1 class="h4 mb-1">Cronograma</h1>
+<p class="text-muted">Cada barra va desde la fecha de solicitud o inicio hasta la fecha límite. El rombo marca el plazo
+  y los puntos, las subtareas. Las tareas sin fechas pero con subtareas fechadas se dibujan desde su primer hasta su último paso.</p>
+
+{{ filtros(filtro, ['unidad_id', 'tipo_id', 'responsable_id', 'ver_concluidas'], url_for('tablero.cronograma'), varias_unidades) }}
+
+{% if datos.hay_barras %}
+<div class="gantt">
+  <div class="g-in">
+    <div class="g-fila g-cab">
+      <div class="g-et">TAREA</div>
+      <div class="g-pista">
+        {% for m in datos.meses %}<div class="g-mes" style="left: {{ m.pct }}%">{{ m.texto }}</div>{% endfor %}
+        <div class="g-hoy" style="left: {{ datos.hoy }}%"><span>HOY</span></div>
+      </div>
+    </div>
+    {% for g in datos.grupos %}
+      {% if g.unidad %}
+      <div class="g-fila grupo"><div class="g-et">{{ g.unidad.sigla }} · {{ g.filas|length }}</div><div class="g-pista">{{ lineas() }}</div></div>
+      {% endif %}
+      {% for f in g.filas %}
+        {% set t = f.i.t %}
+        <div class="g-fila">
+          <div class="g-et">
+            <b title="{{ t.asunto }}">{{ enlace_tarea(t, ver_tareas) }} · {{ t.asunto }}</b>
+            <small>{{ t.tipo.valor }} · {{ t.responsable.nombre if t.responsable else 'sin responsable' }}</small>
+          </div>
+          <div class="g-pista">
+            {{ lineas() }}
+            <div class="g-barra c-{{ f.i.clase }} {{ 'abierta' if f.abierta }}" style="left: {{ f.izq }}%; width: {{ f.ancho }}%"
+                 title="{{ t.codigo }} · {{ t.asunto|truncate(80) }}&#10;Inicio: {{ t.fecha_solicitud|fecha or '—' }} · Límite: {{ t.fecha_limite|fecha or '—' }}&#10;{{ t.estado.valor }} · {{ f.i.alerta }}">
+              {{ ('SEGÚN SUBTAREAS' if f.por_pasos else f.i.alerta) if f.ancho > 9 }}
+            </div>
+            {% if f.hito is not none %}<div class="g-hito" style="left: {{ f.hito }}%" title="Fecha límite {{ t.fecha_limite|fecha }}"></div>{% endif %}
+            {% for p in f.pasos %}<div class="g-sub {{ p.clase }}" style="left: {{ p.pct }}%" title="{{ p.titulo }}"></div>{% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+<div class="g-ley small mt-2">
+  {% for a in ['VENCIDO', 'CRÍTICO', 'POR VENCER', 'SEGUIMIENTO', 'EN CURSO', 'CONCLUIDO'] %}
+    <span><i class="c-{{ a|replace('Í', 'I')|replace(' ', '-') }}"></i>{{ a }}</span>
+  {% endfor %}
+  <span><i class="ley-hito"></i>Fecha límite</span>
+  <span>Barra que se desvanece: sin fecha límite</span>
+  <span><i class="ley-sub"></i>Subtarea (verde: hecha · amarillo: vencida)</span>
+</div>
+{% else %}
+<div class="alert alert-info">No hay tareas con fechas para mostrar con estos filtros.</div>
+{% endif %}
+
+{% if datos.sin_fechas %}
+<section class="mt-4">
+  <h2 class="h6 seccion-titulo">Sin fechas ({{ datos.sin_fechas|length }})</h2>
+  <p class="small text-muted">Registre la fecha de solicitud o la fecha límite para verlas en el cronograma.</p>
+  {% with infos=datos.sin_fechas, con_unidad=varias_unidades, vacio='' %}
+    {% include "tablero/_tabla_tareas.html" %}
+  {% endwith %}
+</section>
+{% endif %}
+{% endblock %}

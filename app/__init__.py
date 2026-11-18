@@ -67,6 +67,7 @@ def _registrar_blueprints(app: Flask) -> None:
     from app.controllers.auth import bp as auth_bp
     from app.controllers.inicio import bp as inicio_bp
     from app.controllers.responsables import bp as responsables_bp
+    from app.controllers.tablero import bp as tablero_bp
     from app.controllers.tareas import bp as tareas_bp
 
     app.register_blueprint(auth_bp)
@@ -74,19 +75,20 @@ def _registrar_blueprints(app: Flask) -> None:
     app.register_blueprint(admin_usuarios_bp)
     app.register_blueprint(tareas_bp)
     app.register_blueprint(responsables_bp)
+    app.register_blueprint(tablero_bp)
 
 
 def _registrar_plantillas(app: Flask) -> None:
     from app.models.usuario import NOMBRES_ROL
     from app.services import permisos
-    from app.utils.fechas import formato_fecha, formato_fecha_hora
+    from app.utils.fechas import ahora_utc, formato_fecha, formato_fecha_hora
 
     app.add_template_filter(formato_fecha, "fecha")
     app.add_template_filter(formato_fecha_hora, "fecha_hora")
 
     @app.context_processor
     def contexto():
-        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista}
+        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista, "ahora": ahora_utc()}
 
 
 def _registrar_errores(app: Flask) -> None:

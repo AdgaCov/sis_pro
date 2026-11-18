@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kpis, filtros %}
+{% block titulo %}Resumen ejecutivo{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+  <div>
+    <h1 class="h4 mb-1">Resumen ejecutivo · Gestiones con el MRE</h1>
+    <p class="text-muted">Solicitudes, autorizaciones y gestiones con el MRE. Las tareas internas no se incluyen.</p>
+  </div>
+  <button type="button" class="btn btn-outline-secondary btn-sm no-imprimir" data-imprimir>Imprimir</button>
+</div>
+<p class="solo-imprimir small">Generado el {{ ahora|fecha_hora }} por {{ current_user.nombre_usuario }}</p>
+
+{{ kpis(datos.kpis) }}
+
+<section class="mb-4">
+  <h2 class="h6 seccion-titulo">Gestiones por unidad</h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle bg-white">
+    <thead class="table-light"><tr><th>Unidad</th><th class="text-end">Total</th><th class="text-end">Pendientes</th>
+      <th class="text-end">Vencidas</th><th class="text-end">Alta pend.</th><th class="text-end">Sin respuesta</th><th class="text-end">Concluidas</th></tr></thead>
+    <tbody>
+    {% for r in datos.por_unidad %}
+      <tr>
+        <td><b>{{ r.unidad.sigla }}</b><br><span class="marca-sm">{{ r.unidad.nombre }}</span></td>
+        <td class="text-end">{{ r.total }}</td><td class="text-end">{{ r.pendientes }}</td>
+        <td class="text-end {{ 'text-danger fw-bold' if r.vencidas }}">{{ r.vencidas }}</td>
+        <td class="text-end">{{ r.alta }}</td><td class="text-end">{{ r.sin_respuesta }}</td><td class="text-end">{{ r.concluidas }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-7">
+    <h2 class="h6 seccion-titulo">Pendientes por instancia del MRE</h2>
+    <table class="table table-sm bg-white">
+      <thead class="table-light"><tr><th>Instancia</th><th class="text-end">Pendientes</th></tr></thead>
+      <tbody>
+      {% for nombre, n in datos.por_instancia %}<tr><td>{{ nombre }}</td><td class="text-end">{{ n }}</td></tr>
+      {% else %}<tr><td colspan="2" class="text-muted">Sin pendientes.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-5">
+    <h2 class="h6 seccion-titulo">Pendientes por tipo</h2>
+    <table class="table table-sm bg-white">
+      <thead class="table-light"><tr><th>Tipo</th><th class="text-end">Pendientes</th></tr></thead>
+      <tbody>
+      {% for nombre, n in datos.por_tipo %}<tr><td>{{ nombre }}</td><td class="text-end">{{ n }}</td></tr>
+      {% else %}<tr><td colspan="2" class="text-muted">Sin pendientes.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<section>
+  <h2 class="h6 seccion-titulo">Detalle consolidado <span class="text-muted fw-normal">· {{ detalle|length }} gestiones</span></h2>
+  {{ filtros(filtro, ['texto', 'unidad_id', 'tipo_id', 'instancia_id', 'area_id', 'alerta', 'ver_concluidas'],
+             url_for('tablero.resumen_ejecutivo'), varias_unidades) }}
+  {% with infos=detalle, con_unidad=True, vacio='Sin gestiones con el MRE para mostrar.' %}
+    {% include "tablero/_tabla_tareas.html" %}
+  {% endwith %}
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/imprimir.js') }}"></script>{% endblock %}

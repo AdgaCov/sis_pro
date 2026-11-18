@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kpis, filtros, chip_alerta, enlace_tarea, responsable %}
+{% block titulo %}Informe de tareas críticas{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+  <div>
+    <h1 class="h4 mb-1">Informe de tareas críticas</h1>
+    <p class="text-muted mb-1">Tareas abiertas vencidas, críticas (prioridad alta con más de {{ config.DIAS_CRITICO }} días),
+      de riesgo alto o de prioridad alta por vencer.</p>
+  </div>
+  <button type="button" class="btn btn-outline-secondary btn-sm no-imprimir" data-imprimir>Imprimir</button>
+</div>
+<p class="solo-imprimir small">
+  {{ unidades[0].nombre if filtro.unidad_id.data and unidades else 'Todas las unidades' }} ·
+  Generado el {{ ahora|fecha_hora }} por {{ current_user.nombre_usuario }}
+</p>
+
+{{ filtros(filtro, ['unidad_id'], url_for('tablero.informe'), varias_unidades) }}
+{{ kpis(datos.kpis) }}
+
+{% for g in datos.grupos %}
+<section class="mb-4">
+  <h2 class="h6 seccion-titulo">{{ g.unidad.nombre }} · {{ g['items']|length }}</h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle bg-white tabla-tareas">
+    <thead class="table-light"><tr><th>Código</th><th>Tarea / asunto</th><th>Responsable</th><th>Límite</th><th>Alerta</th>
+      <th>Riesgo por demora</th><th>Línea de solución</th><th>Plazo</th></tr></thead>
+    <tbody>
+    {% for i in g['items'] %}
+      {% set t = i.t %}
+      <tr>
+        <td class="font-monospace text-nowrap fw-semibold">{{ enlace_tarea(t, ver_tareas) }}<br><span class="marca-sm">{{ t.tipo.valor }}</span></td>
+        <td class="asunto">{{ t.asunto }}{% if i.mre and t.instancia %}<small class="d-block marca-sm">{{ t.instancia.valor }}</small>{% endif %}</td>
+        <td class="small" style="min-width: 140px">{{ responsable(t) }}</td>
+        <td class="small text-nowrap">{{ t.fecha_limite|fecha or '—' }}
+          {% if i.faltan is not none %}<br><span class="marca-sm">{% if i.faltan < 0 %}hace {{ -i.faltan }} días{% elif i.faltan == 0 %}hoy{% else %}en {{ i.faltan }} días{% endif %}</span>{% endif %}</td>
+        <td>{{ chip_alerta(i.alerta) }}{% if t.nivel_riesgo %}<br><span class="marca-sm">Riesgo {{ t.nivel_riesgo|lower }}</span>{% endif %}</td>
+        <td class="small text-muted" style="min-width: 160px">{{ t.riesgo_demora or '—' }}</td>
+        <td class="small" style="min-width: 180px">{% if t.linea_solucion %}{{ t.linea_solucion }}{% else %}<span class="chip a-CRITICO">Sin definir</span>{% endif %}</td>
+        <td class="small text-nowrap">{{ t.plazo_solucion|fecha or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% else %}
+<div class="alert alert-success">No hay tareas críticas en este momento.</div>
+{% endfor %}
+
+{% if datos.sin_solucion %}
+<section class="mb-4">
+  <h2 class="h6 seccion-titulo">Requieren definir línea de solución ({{ datos.sin_solucion|length }})</h2>
+  <ul class="small">
+    {% for i in datos.sin_solucion %}<li><b>{{ enlace_tarea(i.t, ver_tareas) }}</b> · {{ i.t.asunto|truncate(140) }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/imprimir.js') }}"></script>{% endblock %}

@@ -1,41 +1,31 @@
 {% extends "base.html" %}
+{% from "_macros.html" import kpis as indicadores %}
 {% block titulo %}Inicio{% endblock %}
 {% block contenido %}
 <h1 class="h4 mb-1">Bienvenido, {{ current_user.nombre_completo }}</h1>
 <p class="text-muted">{{ current_user.nombre_rol }}{% if current_user.unidad %} · {{ current_user.unidad.nombre }}{% endif %}</p>
 
-<div class="row g-3">
-  <div class="col-md-6">
-    <div class="card h-100">
+{% if kpis %}{{ indicadores(kpis) }}{% endif %}
+
+{% if enlaces %}
+<div class="row g-3 mb-4">
+  {% for endpoint, titulo, texto in enlaces %}
+  <div class="col-sm-6 col-lg-4">
+    <a class="card h-100 text-decoration-none" href="{{ url_for(endpoint) }}">
       <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted">Unidades que puede ver</h2>
-        {% if unidades %}
-        <ul class="mb-0">
-          {% for u in unidades %}<li>{{ u.nombre }}</li>{% endfor %}
-        </ul>
-        {% else %}
-        <p class="mb-0 text-muted">Ninguna. Pida a Planificación que configure su acceso.</p>
-        {% endif %}
+        <h2 class="h6 mb-1 titulo-app">{{ titulo }}</h2>
+        <p class="small text-muted mb-0">{{ texto }}</p>
       </div>
-    </div>
+    </a>
   </div>
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted">Vistas disponibles</h2>
-        {% if vistas %}
-        <ul class="mb-0">
-          {% for v in vistas %}<li>{{ v|capitalize }}</li>{% endfor %}
-        </ul>
-        {% else %}
-        <p class="mb-0 text-muted">Ninguna todavía.</p>
-        {% endif %}
-        {% if puede_ver_vista(current_user, 'tareas') %}
-        <a class="btn btn-primary btn-sm mt-3" href="{{ url_for('tareas.lista') }}">Ir a tareas</a>
-        {% endif %}
-        <p class="small text-muted mt-3 mb-0">Tablero e informes se habilitan en la próxima etapa.</p>
-      </div>
-    </div>
-  </div>
+  {% endfor %}
 </div>
+{% else %}
+<div class="alert alert-info">Todavía no tiene vistas habilitadas. Pida a Planificación que configure su acceso.</div>
+{% endif %}
+
+<p class="small text-muted">
+  Unidades que puede ver:
+  {% for u in unidades %}{{ u.sigla }}{{ ', ' if not loop.last }}{% else %}ninguna{% endfor %}
+</p>
 {% endblock %}

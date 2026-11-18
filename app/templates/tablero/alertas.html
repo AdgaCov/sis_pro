@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import filtros, enlace_tarea %}
+{% block titulo %}Alertas{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Alertas</h1>
+<p class="text-muted">Tareas que requieren atención. Una misma tarea puede aparecer en varios grupos.</p>
+
+{{ filtros(filtro, ['unidad_id', 'responsable_id'], url_for('tablero.alertas'), varias_unidades) }}
+
+<div class="al-grid">
+  {% for g in grupos %}
+  <div class="al-caja">
+    <div class="al-cab {{ g.color }}">
+      <div>{{ g.titulo }}<small>{{ g.descripcion }}</small></div>
+      <b>{{ g['items']|length }}</b>
+    </div>
+    {% for i, detalle in g['items'] %}
+    <div class="al-item">
+      <div class="l1"><b>{{ enlace_tarea(i.t, ver_tareas) }}</b>{% if varias_unidades %} <span class="marca-sm">{{ i.t.unidad.sigla }}</span>{% endif %} · {{ i.t.asunto|truncate(110) }}</div>
+      <div class="l2">{{ detalle }} · {{ (i.t.responsable.nombre ~ ((' (' ~ i.t.responsable.persona ~ ')') if i.t.responsable.persona else '')) if i.t.responsable else 'sin responsable' }}</div>
+    </div>
+    {% else %}
+    <div class="al-vacio">Nada pendiente.</div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

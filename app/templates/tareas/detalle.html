@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import chip_alerta %}
 {% block titulo %}{{ tarea.codigo }}{% endblock %}
 {% macro dato(etiqueta, valor, ancho="col-md-6") %}
   <div class="{{ ancho }}">
@@ -11,6 +12,7 @@
   <div>
     <a class="small" href="{{ url_for('tareas.lista') }}">&larr; Tareas</a>
     <h1 class="h4 mb-1"><span class="font-monospace">{{ tarea.codigo }}</span> · {{ tarea.unidad.sigla }}</h1>
+    {{ chip_alerta(info.alerta) }}
     <span class="badge text-bg-secondary">{{ tarea.tipo.valor }}</span>
     <span class="badge text-bg-primary">{{ tarea.estado.valor }}</span>
     {% if tarea.prioridad %}<span class="badge text-bg-light border">Prioridad {{ tarea.prioridad.valor }}</span>{% endif %}
@@ -26,6 +28,21 @@
   </div>
   {% endif %}
 </div>
+
+{% set senales = [] %}
+{% if info.sin_actualizar %}{% set _ = senales.append('Sin actualizar hace ' ~ info.dias_sin_actualizar ~ ' días') %}{% endif %}
+{% if info.subtareas_vencidas %}{% set _ = senales.append(info.subtareas_vencidas|length ~ ' subtarea(s) vencida(s)') %}{% endif %}
+{% if info.bloquea %}{% set _ = senales.append('Bloquea la tarea ' ~ tarea.habilita_a.codigo) %}{% endif %}
+{% if info.bloqueada_por %}{% set _ = senales.append('Espera a: ' ~ info.bloqueada_por|join(', ')) %}{% endif %}
+{% if info.sin_responsable %}{% set _ = senales.append('Sin responsable') %}{% endif %}
+{% if info.sin_fecha_limite %}{% set _ = senales.append('Sin fecha límite') %}{% endif %}
+{% if info.sin_solucion %}{% set _ = senales.append('Crítica sin línea de solución') %}{% endif %}
+{% if info.sin_respaldo %}{% set _ = senales.append('Concluida sin medio de verificación') %}{% endif %}
+{% if senales %}
+<div class="alert alert-warning py-2 small">
+  <b>Atención:</b> {{ senales|join(' · ') }}
+</div>
+{% endif %}
 
 <div class="card shadow-sm mb-3">
   <div class="card-body row g-3">

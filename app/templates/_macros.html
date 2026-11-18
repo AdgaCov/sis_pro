@@ -6,3 +6,50 @@
     {% for e in field.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
   </div>
 {% endmacro %}
+
+{% macro chip_alerta(alerta) %}<span class="chip a-{{ alerta|replace('Í', 'I')|replace(' ', '-') }}">{{ alerta }}</span>{% endmacro %}
+
+{% macro kpis(lista) %}
+<div class="kpis mb-3">
+  {% for etiqueta, valor, resaltar in lista %}
+  <div class="kpi {{ 'alerta' if resaltar and valor }}"><span>{{ etiqueta }}</span><b>{{ valor }}</b></div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# Enlace a la tarea solo si el usuario puede ver la vista de tareas #}
+{% macro enlace_tarea(t, ver_tareas, texto=None) %}
+  {%- if ver_tareas -%}<a href="{{ url_for('tareas.detalle', tarea_id=t.id) }}">{{ texto or t.codigo }}</a>
+  {%- else -%}{{ texto or t.codigo }}{%- endif -%}
+{% endmacro %}
+
+{% macro responsable(t, con_unidad=False) %}
+  {%- if t.responsable -%}
+    {{ (t.responsable.unidad.sigla ~ ' · ') if con_unidad or t.responsable.unidad_id != t.unidad_id }}{{ t.responsable.nombre }}
+    {%- if t.responsable.persona %}<br><span class="marca-sm">{{ t.responsable.persona }}</span>{% endif -%}
+  {%- else -%}<span class="chip a-SIN-FECHA">Sin asignar</span>{%- endif -%}
+{% endmacro %}
+
+{# Campos de filtro por GET. `campos`: nombres del FiltroTareasForm que se muestran. #}
+{% macro filtros(filtro, campos, accion, varias_unidades=True) %}
+<form method="get" action="{{ accion }}" class="card card-body py-2 mb-3 no-imprimir">
+  <div class="row g-2 align-items-end">
+    {% for nombre in campos %}
+      {% set f = filtro[nombre] %}
+      {% if nombre == 'unidad_id' and not varias_unidades %}
+      {% elif nombre == 'responsable_id' and f.choices|length <= 1 %}
+      {% elif nombre == 'texto' %}
+        <div class="col-12 col-md-3">{{ f.label(class="form-label small mb-0") }}{{ f(class="form-control form-control-sm", placeholder="Código, asunto, responsable, HR…") }}</div>
+      {% elif nombre == 'ver_concluidas' %}
+        <div class="col-6 col-md-auto"><div class="form-check mb-1">{{ f(class="form-check-input") }}{{ f.label(class="form-check-label small") }}</div></div>
+      {% else %}
+        <div class="col-6 col-md">{{ f.label(class="form-label small mb-0") }}{{ f(class="form-select form-select-sm") }}</div>
+      {% endif %}
+    {% endfor %}
+    <div class="col-12 col-md-auto">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Filtrar</button>
+      <a class="btn btn-sm btn-link" href="{{ accion }}">Limpiar</a>
+    </div>
+  </div>
+</form>
+{% endmacro %}

@@ -250,29 +250,7 @@ def papelera(limite: int = 200):
             .order_by(Auditoria.fecha.desc()).limit(limite).all())
 
 
-# ------------------------------------------------------------------ listado
-def listar(usuario: Usuario, filtros: dict):
-    """Consulta de tareas visibles con filtros simples. Devuelve un query ordenado."""
-    q = permisos.consulta_tareas(usuario)
-    if filtros.get("unidad_id"):
-        q = q.filter(Tarea.unidad_id == filtros["unidad_id"])
-    for campo in ("tipo_id", "estado_id", "prioridad_id", "responsable_id"):
-        if filtros.get(campo):
-            q = q.filter(getattr(Tarea, campo) == filtros[campo])
-    if not filtros.get("ver_concluidas"):
-        concluido = Catalogo.query.filter_by(tipo="estado", valor=ESTADO_CONCLUIDO).first()
-        if concluido:
-            q = q.filter(Tarea.estado_id != concluido.id)
-    texto = (filtros.get("texto") or "").strip()
-    if texto:
-        patron = f"%{texto}%"
-        q = q.outerjoin(Cargo, Tarea.responsable_id == Cargo.id).filter(db.or_(
-            Tarea.codigo.ilike(patron), Tarea.asunto.ilike(patron), Tarea.hoja_ruta.ilike(patron),
-            Tarea.resultado.ilike(patron), Cargo.nombre.ilike(patron), Cargo.persona.ilike(patron),
-        ))
-    return q.order_by(Tarea.fecha_limite.is_(None), Tarea.fecha_limite, Tarea.codigo)
-
-
+# ------------------------------------------------------------------ consultas
 def adjunto_de(tarea: Tarea, adjunto_id: int) -> Adjunto | None:
     return next((a for a in tarea.adjuntos if a.id == adjunto_id), None)
 
