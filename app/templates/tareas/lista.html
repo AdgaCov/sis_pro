@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import filtros %}
+{% from "_macros.html" import filtros, menu_documentos %}
+{% macro url_doc(p, formato) %}{{ url_for('documentos.listado', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
 {% block titulo %}Tareas{% endblock %}
 {% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% block contenido %}
@@ -8,7 +9,10 @@
     <h1 class="h4 mb-0">Tareas <span class="text-muted fs-6">({{ pagina.total }})</span></h1>
     <p class="small text-muted mb-0">Ordenadas por alerta: primero las vencidas y críticas.</p>
   </div>
-  {% if puede_crear %}<a class="btn btn-primary" href="{{ url_for('tareas.nueva') }}">Nueva tarea</a>{% endif %}
+  <div class="text-nowrap">
+    {{ menu_documentos(plantillas, url_doc, hay_pdf()) }}
+    {% if puede_crear %}<a class="btn btn-primary" href="{{ url_for('tareas.nueva') }}">Nueva tarea</a>{% endif %}
+  </div>
 </div>
 
 {{ filtros(filtro, ['texto', 'unidad_id', 'tipo_id', 'estado_id', 'prioridad_id', 'area_id', 'responsable_id', 'alerta', 'ver_concluidas'],

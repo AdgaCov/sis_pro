@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis, filtros, chip_alerta, enlace_tarea, responsable %}
+{% from "_macros.html" import kpis, filtros, chip_alerta, enlace_tarea, responsable, menu_documentos %}
+{% macro url_doc(p, formato) %}{{ url_for('documentos.informe', plantilla_id=p.id, formato=formato, unidad_id=filtro.unidad_id.data or None) }}{% endmacro %}
 {% block titulo %}Informe de tareas críticas{% endblock %}
 {% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% block contenido %}
@@ -9,7 +10,10 @@
     <p class="text-muted mb-1">Tareas abiertas vencidas, críticas (prioridad alta con más de {{ config.DIAS_CRITICO }} días),
       de riesgo alto o de prioridad alta por vencer.</p>
   </div>
-  <button type="button" class="btn btn-outline-secondary btn-sm no-imprimir" data-imprimir>Imprimir</button>
+  <div class="text-nowrap">
+    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+    <button type="button" class="btn btn-outline-secondary btn-sm no-imprimir" data-imprimir>Imprimir</button>
+  </div>
 </div>
 <p class="solo-imprimir small">
   {{ unidades[0].nombre if filtro.unidad_id.data and unidades else 'Todas las unidades' }} ·

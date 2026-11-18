@@ -10,6 +10,7 @@ from app.models.usuario import ROL_ADMIN
 from app.services import ErrorNegocio, permisos
 from app.services import archivos as srv_archivos
 from app.services import alertas
+from app.services import plantillas as srv_plantillas
 from app.services import responsables as srv_resp
 from app.services import resumen
 from app.services import tareas as srv
@@ -64,13 +65,28 @@ def formulario_filtros() -> FiltroTareasForm:
     return filtro
 
 
+def texto_filtros(filtro) -> str:
+    """Descripción legible de los filtros aplicados."""
+    partes = []
+    for nombre in ("unidad_id", "tipo_id", "instancia_id", "area_id", "alerta"):
+        campo = filtro[nombre]
+        if campo.data:
+            etiqueta = next((l for v, l in campo.choices if v == campo.data), campo.data)
+            partes.append(f"{campo.label.text}: {etiqueta}")
+    if (filtro.texto.data or "").strip():
+        partes.append(f"Búsqueda: «{filtro.texto.data.strip()}»")
+    partes.append("incluye concluidas" if filtro.ver_concluidas.data else "solo abiertas")
+    return " · ".join(partes)
+
+
 @bp.route("")
 def lista():
     filtro = formulario_filtros()
     infos = resumen.filtrar(resumen.cargar(current_user), filtro.data)
     pagina = Pagina(infos, request.args.get("pagina", 1, type=int), current_app.config["TAREAS_POR_PAGINA"])
     puede_crear = current_user.ve_todo or (current_user.es_unidad and current_user.unidad_id)
-    return render_template("tareas/lista.html", pagina=pagina, filtro=filtro, puede_crear=puede_crear)
+    return render_template("tareas/lista.html", pagina=pagina, filtro=filtro, puede_crear=puede_crear,
+                           plantillas=srv_plantillas.activas("listado"))
 
 
 # ------------------------------------------------------------------ alta / edición
@@ -129,7 +145,7 @@ def detalle(tarea_id: int):
         "tareas/detalle.html", tarea=tarea, habilitada_por=habilitada_por, info=alertas.info(tarea, bloqueada_por=abiertas),
         puede_editar=permisos.puede_editar_tarea(current_user, tarea),
         ve_adjuntos=permisos.puede_ver_adjuntos(current_user, tarea),
-        accion=AccionForm(), form_adjunto=AdjuntoForm(),
+        accion=AccionForm(), form_adjunto=AdjuntoForm(), plantillas=srv_plantillas.activas("tarea"),
         ve_habilita=tarea.habilita_a is not None and permisos.puede_ver_tarea(current_user, tarea.habilita_a),
     )
 

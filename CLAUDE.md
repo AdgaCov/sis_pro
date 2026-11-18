@@ -100,7 +100,9 @@ El admin sube `.docx` o `.xlsx` a `storage/plantillas/` e indica su **alcance**:
 - Word: `docxtpl` con `jinja2.sandbox.SandboxedEnvironment`. Listas con `{% for t in tareas %}…{% endfor %}`.
 - Excel: `openpyxl`, reemplaza `{{ marcador }}` en celdas; una fila con marcadores `{{ t.xxx }}` se repite por cada tarea conservando el formato.
 - Salida: el mismo formato o PDF (LibreOffice `soffice --headless --convert-to pdf`, con tiempo límite).
-- Al subir: validar marcadores contra el catálogo `marcador` y listar los desconocidos. Botón «Probar» con datos de ejemplo.
+- Al subir: validar marcadores contra el catálogo `MARCADORES` (en `services/plantillas.py`, se muestra en Admin › Plantillas › Marcadores) y listar los desconocidos (quedan vacíos al generar). Botón «Probar» con datos de ejemplo.
+- Se generan desde «Generar documento»: ficha (detalle de tarea), listado (Tareas, con los filtros) e informe (Informe crítico). El invitado no genera documentos.
+- Sin LibreOffice, solo se ofrece el formato original; `SOFFICE_PATH` en `.env` indica su ruta.
 - El invitado solo descarga el PDF del resumen ejecutivo, con datos de sus unidades.
 
 Marcadores base: `unidad.nombre`, `tarea.codigo`, `tarea.asunto`, `tarea.tipo`, `tarea.instancia`, `tarea.estado`, `tarea.prioridad`, `tarea.alerta`, `tarea.fecha_solicitud`, `tarea.fecha_limite`, `tarea.responsable`, `tarea.persona`, `tarea.hoja_ruta`, `tarea.resultado`, `tarea.solucion`, `resumen.total`, `resumen.pendientes`, `resumen.vencidas`, `generado.fecha`, `generado.por`.

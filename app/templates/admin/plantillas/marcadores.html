@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}Marcadores{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Marcadores disponibles</h1>
+<p class="text-muted">Escríbalos en la plantilla entre llaves dobles, por ejemplo <code>{{ '{{ tarea.asunto }}' }}</code>.</p>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <h2 class="h6 seccion-titulo">Word (.docx)</h2>
+    <ul class="small">
+      <li>Un valor: <code>{{ '{{ tarea.codigo }}' }}</code></li>
+      <li>Párrafos repetidos: <code>{{ '{% for t in tareas %}' }}</code> … <code>{{ '{{ t.asunto }}' }}</code> … <code>{{ '{% endfor %}' }}</code></li>
+      <li>Fila de tabla repetida: en la primera celda <code>{{ '{%tr for t in tareas %}' }}</code>, los marcadores
+        <code>{{ '{{ t.codigo }}' }}</code> en las celdas, y en una fila siguiente <code>{{ '{%tr endfor %}' }}</code>.</li>
+      <li>Subtareas: <code>{{ '{% for s in tarea.subtareas %}' }}{{ '{{ s.texto }}' }}{{ '{% endfor %}' }}</code></li>
+      <li>Condición: <code>{{ "{% if tarea.alerta == 'VENCIDO' %}" }}…{{ '{% endif %}' }}</code></li>
+    </ul>
+  </div>
+  <div class="col-lg-6">
+    <h2 class="h6 seccion-titulo">Excel (.xlsx)</h2>
+    <ul class="small">
+      <li>Cualquier celda con <code>{{ '{{ resumen.total }}' }}</code> o <code>{{ '{{ unidad.nombre }}' }}</code> se reemplaza.</li>
+      <li>Una fila con marcadores <code>{{ '{{ t.xxx }}' }}</code> se repite una vez por tarea, conservando el formato.</li>
+      <li>Las celdas que solo tienen un número (p. ej. <code>{{ '{{ resumen.vencidas }}' }}</code>) quedan como número.</li>
+    </ul>
+  </div>
+</div>
+
+<table class="table table-sm bg-white">
+  <thead class="table-light"><tr><th>Marcador</th><th>Contenido</th></tr></thead>
+  <tbody>
+  {% for nombre, texto in marcadores.items() %}
+    <tr><td><code>{{ nombre }}</code></td><td class="small">{{ texto }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="small text-muted">En listas, use el nombre de la variable del <code>for</code>: <code>t.codigo</code> equivale a <code>tarea.codigo</code>
+  y <code>s.texto</code> a <code>subtarea.texto</code>. Un marcador desconocido queda vacío.</p>
+{% endblock %}

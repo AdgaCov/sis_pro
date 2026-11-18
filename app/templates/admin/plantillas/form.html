@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ 'Editar plantilla' if plantilla else 'Nueva plantilla' }}{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+  <div class="col-md-9 col-lg-7">
+    <h1 class="h4 mb-3">{{ 'Editar plantilla' if plantilla else 'Nueva plantilla' }}</h1>
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {{ form.hidden_tag() }}
+          {{ campo(form.nombre) }}
+          {{ campo(form.descripcion, rows=2) }}
+          {{ campo(form.alcance) }}
+          <ul class="form-text mt-n2 mb-3 ps-3">
+            <li><b>Ficha de una tarea:</b> se genera desde el detalle de la tarea. Use <code>{{ '{{ tarea.xxx }}' }}</code>.</li>
+            <li><b>Listado:</b> se genera desde Tareas con los filtros aplicados. Recorra <code>tareas</code>.</li>
+            <li><b>Informe crítico:</b> se genera desde el informe, solo con las tareas críticas.</li>
+          </ul>
+          {{ campo(form.archivo, accept=".docx,.xlsx") }}
+          <p class="form-text mt-n2 mb-3">
+            {% if plantilla %}Actual: <b>{{ plantilla.nombre_original }}</b>. Deje vacío para conservarlo.{% endif %}
+            Máximo {{ config.MAX_MB_ADJUNTO }} MB. Al subirla se revisan los marcadores y se avisa de los desconocidos.
+          </p>
+          {{ form.enviar(class="btn btn-primary") }}
+          <a class="btn btn-link" href="{{ url_for('admin_plantillas.lista') }}">Cancelar</a>
+          <a class="btn btn-link float-end" href="{{ url_for('admin_plantillas.marcadores') }}" target="_blank">Ver marcadores</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

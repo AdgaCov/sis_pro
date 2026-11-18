@@ -1,9 +1,9 @@
 from flask import Blueprint, abort, current_app, make_response, render_template
 from flask_login import current_user
 
-from app.controllers.tareas import formulario_filtros
+from app.controllers.tareas import formulario_filtros, texto_filtros
 from app.extensions import db
-from app.services import auditoria, pdf, permisos, resumen
+from app.services import auditoria, pdf, permisos, plantillas, resumen
 from app.utils.fechas import a_local, ahora_utc, formato_fecha_hora
 
 bp = Blueprint("tablero", __name__, url_prefix="/tablero")
@@ -34,20 +34,6 @@ def resumen_ejecutivo():
     return render_template("tablero/resumen.html", datos=datos, detalle=detalle, **ctx)
 
 
-def _texto_filtros(filtro) -> str:
-    """Descripción legible de los filtros aplicados al detalle."""
-    partes = []
-    for nombre in ("unidad_id", "tipo_id", "instancia_id", "area_id", "alerta"):
-        campo = filtro[nombre]
-        if campo.data:
-            etiqueta = next((l for v, l in campo.choices if v == campo.data), campo.data)
-            partes.append(f"{campo.label.text}: {etiqueta}")
-    if (filtro.texto.data or "").strip():
-        partes.append(f"Búsqueda: «{filtro.texto.data.strip()}»")
-    partes.append("incluye concluidas" if filtro.ver_concluidas.data else "solo abiertas")
-    return "Filtros del detalle: " + " · ".join(partes)
-
-
 @bp.route("/resumen.pdf")
 def resumen_pdf():
     _exigir("resumen")
@@ -59,7 +45,7 @@ def resumen_pdf():
     alcance = "Unidades: " + (", ".join(u.sigla for u in unidades) or "ninguna")
     ahora = ahora_utc()
     generado = f"Generado el {formato_fecha_hora(ahora)} por {current_user.nombre_usuario}"
-    contenido = pdf.resumen_ejecutivo(datos, detalle, alcance, _texto_filtros(filtro), generado)
+    contenido = pdf.resumen_ejecutivo(datos, detalle, alcance, "Filtros del detalle: " + texto_filtros(filtro), generado)
 
     auditoria.registrar("descargar_pdf", current_user, "resumen", None, {"gestiones": len(detalle)})
     db.session.commit()
@@ -87,7 +73,8 @@ def informe():
     filtro = formulario_filtros()
     ctx = _contexto(filtro)
     infos = resumen.filtrar(resumen.cargar(current_user), {"unidad_id": filtro.unidad_id.data})
-    return render_template("tablero/informe.html", datos=resumen.informe_critico(infos, ctx["unidades"]), **ctx)
+    return render_template("tablero/informe.html", datos=resumen.informe_critico(infos, ctx["unidades"]),
+                           plantillas=plantillas.activas("informe"), **ctx)
 
 
 @bp.route("/cronograma")

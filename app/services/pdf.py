@@ -1,10 +1,12 @@
-"""PDF generados directamente con reportlab (sin LibreOffice).
-
-La conversión de plantillas Word/Excel a PDF con LibreOffice se agrega en la Etapa 5.
-"""
+"""PDF: el resumen ejecutivo se genera con reportlab; las plantillas Word/Excel se convierten con LibreOffice."""
 import io
+import shutil
+import subprocess
+import uuid
+from pathlib import Path
 from xml.sax.saxutils import escape
 
+from flask import current_app
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
@@ -12,6 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from app.services import ErrorNegocio
 from app.utils.fechas import formato_fecha
 
 AZUL = colors.HexColor("#1F3864")
@@ -145,3 +148,50 @@ def resumen_ejecutivo(datos: dict, detalle: list, alcance: str, filtros: str, ge
     pie = f"Resumen ejecutivo · {generado}"
     doc.build(h, onFirstPage=lambda c, d: _pie(c, d, pie), onLaterPages=lambda c, d: _pie(c, d, pie))
     return buf.getvalue()
+
+
+# ------------------------------------------------------------------ conversión con LibreOffice
+def ruta_soffice() -> str | None:
+    """Ruta del ejecutable de LibreOffice, o None si no está instalado."""
+    configurada = current_app.config.get("SOFFICE_PATH") or "soffice"
+    if Path(configurada).is_file():
+        return configurada
+    return shutil.which(configurada)
+
+
+def libreoffice_disponible() -> bool:
+    return ruta_soffice() is not None
+
+
+def convertir_a_pdf(datos: bytes, extension: str) -> bytes:
+    """Convierte un .docx/.xlsx a PDF con LibreOffice headless, con tiempo límite.
+
+    Trabaja en una carpeta temporal dentro de storage/generados/ que se borra siempre al terminar.
+    """
+    soffice = ruta_soffice()
+    if not soffice:
+        raise ErrorNegocio("LibreOffice no está instalado en el servidor: no se puede generar PDF. "
+                           "Descargue el documento en su formato original.")
+    carpeta = current_app.config["STORAGE_DIR"] / "generados" / uuid.uuid4().hex
+    carpeta.mkdir(parents=True)
+    try:
+        entrada = carpeta / f"documento.{extension}"
+        entrada.write_bytes(datos)
+        perfil = (carpeta / "perfil").resolve().as_uri()  # perfil propio: permite conversiones simultáneas
+        try:
+            subprocess.run(
+                [soffice, f"-env:UserInstallation={perfil}", "--headless", "--norestore", "--nologo",
+                 "--convert-to", "pdf", "--outdir", str(carpeta), str(entrada)],
+                check=True, capture_output=True, timeout=current_app.config["SOFFICE_TIMEOUT"],
+            )
+        except subprocess.TimeoutExpired as e:
+            raise ErrorNegocio("La conversión a PDF tardó demasiado. Intente de nuevo o descargue el original.") from e
+        except (subprocess.CalledProcessError, OSError) as e:
+            current_app.logger.error("Fallo LibreOffice: %s", getattr(e, "stderr", e))
+            raise ErrorNegocio("No se pudo convertir el documento a PDF.") from e
+        salida = carpeta / "documento.pdf"
+        if not salida.is_file():
+            raise ErrorNegocio("No se pudo convertir el documento a PDF.")
+        return salida.read_bytes()
+    finally:
+        shutil.rmtree(carpeta, ignore_errors=True)

@@ -53,3 +53,21 @@
   </div>
 </form>
 {% endmacro %}
+
+{# Menú «Generar documento». url(p, formato) devuelve el enlace de cada plantilla. #}
+{% macro menu_documentos(plantillas, url, hay_pdf) %}
+{% if plantillas %}
+<div class="dropdown d-inline-block no-imprimir">
+  <button class="btn btn-outline-primary {{ kwargs.get('clase', '') }} dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Generar documento
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    {% for p in plantillas %}
+      <li><h6 class="dropdown-header">{{ p.nombre }}</h6></li>
+      <li><a class="dropdown-item" href="{{ url(p, 'original') }}">Descargar {{ 'Word' if p.formato == 'docx' else 'Excel' }}</a></li>
+      {% if hay_pdf %}<li><a class="dropdown-item" href="{{ url(p, 'pdf') }}">Descargar PDF</a></li>{% endif %}
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endmacro %}

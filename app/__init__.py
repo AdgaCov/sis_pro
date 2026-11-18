@@ -64,8 +64,10 @@ def _registrar_sesion(app: Flask) -> None:
 
 def _registrar_blueprints(app: Flask) -> None:
     from app.controllers.admin.invitados import bp as admin_invitados_bp
+    from app.controllers.admin.plantillas import bp as admin_plantillas_bp
     from app.controllers.admin.usuarios import bp as admin_usuarios_bp
     from app.controllers.auth import bp as auth_bp
+    from app.controllers.documentos import bp as documentos_bp
     from app.controllers.inicio import bp as inicio_bp
     from app.controllers.responsables import bp as responsables_bp
     from app.controllers.tablero import bp as tablero_bp
@@ -75,6 +77,8 @@ def _registrar_blueprints(app: Flask) -> None:
     app.register_blueprint(inicio_bp)
     app.register_blueprint(admin_usuarios_bp)
     app.register_blueprint(admin_invitados_bp)
+    app.register_blueprint(admin_plantillas_bp)
+    app.register_blueprint(documentos_bp)
     app.register_blueprint(tareas_bp)
     app.register_blueprint(responsables_bp)
     app.register_blueprint(tablero_bp)
@@ -82,7 +86,7 @@ def _registrar_blueprints(app: Flask) -> None:
 
 def _registrar_plantillas(app: Flask) -> None:
     from app.models.usuario import NOMBRES_ROL
-    from app.services import permisos
+    from app.services import pdf, permisos
     from app.utils.fechas import ahora_utc, formato_fecha, formato_fecha_hora
 
     app.add_template_filter(formato_fecha, "fecha")
@@ -90,7 +94,8 @@ def _registrar_plantillas(app: Flask) -> None:
 
     @app.context_processor
     def contexto():
-        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista, "ahora": ahora_utc()}
+        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista, "ahora": ahora_utc(),
+                "hay_pdf": pdf.libreoffice_disponible}
 
 
 def _registrar_errores(app: Flask) -> None:
