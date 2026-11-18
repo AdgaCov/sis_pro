@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ 'Editar usuario' if usuario else 'Nuevo usuario' }}{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <h1 class="h4 mb-3">
+      {% if usuario %}Editar usuario <span class="font-monospace">{{ usuario.nombre_usuario }}</span>{% else %}Nuevo usuario{% endif %}
+    </h1>
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          {% if not usuario %}
+            {{ campo(form.nombre_usuario, autocomplete="off") }}
+            <p class="form-text mt-n2 mb-3">Letras, números, punto, guion o guion bajo. Se guarda en minúsculas.</p>
+          {% endif %}
+          {{ campo(form.nombre_completo) }}
+          {{ campo(form.rol) }}
+          {{ campo(form.unidad_id) }}
+          <p class="form-text mt-n2 mb-3">
+            Obligatoria para el rol Unidad. Los permisos de un invitado se configuran aparte.
+          </p>
+          {% if not usuario %}
+            {{ campo(form.clave, autocomplete="new-password") }}
+            {{ campo(form.confirmar, autocomplete="new-password") }}
+            <p class="form-text mt-n2 mb-3">Mínimo 8 caracteres, con letras y números.</p>
+            <div class="form-check mb-3">
+              {{ form.debe_cambiar(class="form-check-input") }}
+              {{ form.debe_cambiar.label(class="form-check-label") }}
+            </div>
+          {% endif %}
+          {{ form.enviar(class="btn btn-primary") }}
+          <a class="btn btn-link" href="{{ url_for('admin_usuarios.lista') }}">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

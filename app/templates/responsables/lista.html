@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}Responsables{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Responsables</h1>
+<p class="text-muted">El responsable de una tarea es un cargo. Cada cargo puede tener una persona designada.
+  Use «Apoyo» para asignaciones provisionales cuando un cargo esté acéfalo.</p>
+
+{% if form.unidad_id.choices %}
+<form method="post" action="{{ url_for('responsables.nuevo') }}" class="card card-body py-2 mb-4">
+  {{ form.hidden_tag() }}
+  <div class="row g-2 align-items-end">
+    {% if current_user.ve_todo %}
+    <div class="col-md-3">{{ form.unidad_id.label(class="form-label small mb-0") }}{{ form.unidad_id(class="form-select form-select-sm") }}</div>
+    {% endif %}
+    <div class="col-md">{{ form.nombre.label(class="form-label small mb-0") }}{{ form.nombre(class="form-control form-control-sm", placeholder="Ej.: Profesional en Turismo") }}</div>
+    <div class="col-md">{{ form.persona.label(class="form-label small mb-0") }}{{ form.persona(class="form-control form-control-sm") }}</div>
+    <div class="col-md-auto">{{ form.enviar(class="btn btn-sm btn-primary") }}</div>
+  </div>
+</form>
+{% endif %}
+
+{% for u in unidades %}
+{% set editable = puede_editar(u) %}
+<section class="mb-4" id="unidad-{{ u.id }}">
+  <h2 class="h6 text-uppercase">{{ u.nombre }}
+    <span class="text-muted fw-normal">· {{ u.cargos|selectattr('activo')|list|length }} cargos activos</span></h2>
+  <div class="table-responsive">
+  <table class="table table-sm align-middle bg-white">
+    <thead class="table-light">
+      <tr><th>Cargo</th><th>Persona designada</th><th class="text-end">Tareas abiertas</th><th>Estado</th><th></th>
+        {% if current_user.es_admin %}<th>Mover a</th>{% endif %}</tr>
+    </thead>
+    <tbody>
+    {% for c in u.cargos %}
+      <tr class="{{ '' if c.activo else 'text-muted' }}">
+        <td>{{ c.nombre }}{% if c.es_apoyo %} <span class="badge text-bg-info">Apoyo</span>{% endif %}</td>
+        <td style="min-width: 260px">
+          {% if editable %}
+          <form method="post" action="{{ url_for('responsables.persona', cargo_id=c.id) }}" class="d-flex gap-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input class="form-control form-control-sm" type="text" name="persona" maxlength="150"
+                   value="{{ c.persona or '' }}" placeholder="Nombre y apellido" aria-label="Persona designada en {{ c.nombre }}">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+          </form>
+          {% else %}{{ c.persona or '—' }}{% endif %}
+        </td>
+        <td class="text-end">{{ abiertas.get(c.id, 0) }}</td>
+        <td>{% if c.activo %}<span class="badge text-bg-success">Activo</span>{% else %}<span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+        <td class="text-nowrap">
+          {% if editable and not (c.es_apoyo and c.activo) %}
+          <form method="post" action="{{ url_for('responsables.estado', cargo_id=c.id) }}"
+                {% if c.activo %}data-confirmar="¿Desactivar el cargo {{ c.nombre }}? Las tareas que lo tienen lo conservan."{% endif %}>
+            {{ accion.hidden_tag() }}
+            <input type="hidden" name="activo" value="{{ '0' if c.activo else '1' }}">
+            <button class="btn btn-sm {{ 'btn-outline-danger' if c.activo else 'btn-outline-success' }}" type="submit">
+              {{ 'Desactivar' if c.activo else 'Activar' }}</button>
+          </form>
+          {% endif %}
+        </td>
+        {% if current_user.es_admin %}
+        <td>
+          {% if not c.es_apoyo %}
+          <form method="post" action="{{ url_for('responsables.mover', cargo_id=c.id) }}" class="d-flex gap-1"
+                data-confirmar="¿Mover el cargo {{ c.nombre }} a otra unidad?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select class="form-select form-select-sm w-auto" name="unidad_id" aria-label="Unidad de destino">
+              {% for v, l in mover.unidad_id.choices %}<option value="{{ v }}" {{ 'selected' if v == u.id }}>{{ l }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Mover</button>
+          </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="text-muted">Sin cargos.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>{% endblock %}

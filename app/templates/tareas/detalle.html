@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tarea.codigo }}{% endblock %}
+{% macro dato(etiqueta, valor, ancho="col-md-6") %}
+  <div class="{{ ancho }}">
+    <div class="small text-uppercase text-muted">{{ etiqueta }}</div>
+    <div class="texto-largo">{{ valor if valor else '—' }}</div>
+  </div>
+{% endmacro %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <a class="small" href="{{ url_for('tareas.lista') }}">&larr; Tareas</a>
+    <h1 class="h4 mb-1"><span class="font-monospace">{{ tarea.codigo }}</span> · {{ tarea.unidad.sigla }}</h1>
+    <span class="badge text-bg-secondary">{{ tarea.tipo.valor }}</span>
+    <span class="badge text-bg-primary">{{ tarea.estado.valor }}</span>
+    {% if tarea.prioridad %}<span class="badge text-bg-light border">Prioridad {{ tarea.prioridad.valor }}</span>{% endif %}
+  </div>
+  {% if puede_editar %}
+  <div class="text-nowrap">
+    <a class="btn btn-primary" href="{{ url_for('tareas.editar', tarea_id=tarea.id) }}">Editar</a>
+    <form class="d-inline" method="post" action="{{ url_for('tareas.eliminar', tarea_id=tarea.id) }}"
+          data-confirmar="¿Eliminar la tarea {{ tarea.codigo }}? Quedará una copia en la papelera.">
+      {{ accion.hidden_tag() }}
+      <button class="btn btn-outline-danger" type="submit">Eliminar</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body row g-3">
+    {{ dato("Tarea / asunto", tarea.asunto, "col-12") }}
+    {{ dato("Gestión requerida / acción", tarea.gestion_requerida, "col-12") }}
+    {{ dato("Área funcional", tarea.area.valor if tarea.area) }}
+    {{ dato("Instancia del MRE", tarea.instancia.valor if tarea.instancia) }}
+    {{ dato("¿Qué habilita?", tarea.que_habilita) }}
+    <div class="col-md-6">
+      <div class="small text-uppercase text-muted">Habilita la tarea</div>
+      {% if tarea.habilita_a and ve_habilita %}
+        <a href="{{ url_for('tareas.detalle', tarea_id=tarea.habilita_a.id) }}">{{ tarea.habilita_a.codigo }}</a>
+        · {{ tarea.habilita_a.asunto|truncate(80) }}
+      {% elif tarea.habilita_a %}{{ tarea.habilita_a.codigo }}{% else %}—{% endif %}
+    </div>
+    {% if habilitada_por %}
+    <div class="col-12">
+      <div class="small text-uppercase text-muted">La habilitan</div>
+      {% for h in habilitada_por %}
+        <a href="{{ url_for('tareas.detalle', tarea_id=h.id) }}">{{ h.codigo }}</a>{{ ', ' if not loop.last }}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {{ dato("Riesgo por demora", tarea.riesgo_demora, "col-12") }}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-header fw-semibold">Seguimiento</div>
+  <div class="card-body row g-3">
+    <div class="col-md-6">
+      <div class="small text-uppercase text-muted">Responsable (cargo)</div>
+      {% if tarea.responsable %}
+        {{ tarea.responsable.nombre }}{% if tarea.responsable.unidad_id != tarea.unidad_id %} <span class="badge text-bg-light border">{{ tarea.responsable.unidad.sigla }}</span>{% endif %}
+        {% if tarea.responsable.persona %}<div class="text-muted">{{ tarea.responsable.persona }}</div>{% endif %}
+      {% else %}<span class="text-danger">Sin responsable</span>{% endif %}
+    </div>
+    {{ dato("Hoja de ruta", tarea.hoja_ruta) }}
+    {{ dato("Fecha solicitud / inicio", tarea.fecha_solicitud|fecha, "col-md-4") }}
+    {{ dato("Fecha límite", tarea.fecha_limite|fecha, "col-md-4") }}
+    {{ dato("Fecha de conclusión", tarea.fecha_conclusion|fecha, "col-md-4") }}
+    {{ dato("Nivel de riesgo", tarea.nivel_riesgo, "col-md-4") }}
+    {{ dato("Plazo de la solución", tarea.plazo_solucion|fecha, "col-md-4") }}
+    {{ dato("Línea de solución", tarea.linea_solucion, "col-12") }}
+    {{ dato("Resultado obtenido", tarea.resultado, "col-12") }}
+    {{ dato("Descripción del respaldo", tarea.medio_verificacion, "col-12") }}
+    {{ dato("Observaciones", tarea.observaciones, "col-12") }}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3" id="subtareas">
+  <div class="card-header fw-semibold">
+    Subtareas / pasos
+    {% if tarea.subtareas %}<span class="text-muted fw-normal">· {{ tarea.subtareas|selectattr('hecho')|list|length }} de {{ tarea.subtareas|length }} hechos</span>{% endif %}
+  </div>
+  <ul class="list-group list-group-flush">
+    {% for s in tarea.subtareas %}
+    <li class="list-group-item d-flex align-items-center gap-2 {{ 'text-muted text-decoration-line-through' if s.hecho }}">
+      {% if puede_editar %}
+      <form method="post" action="{{ url_for('tareas.marcar_subtarea', tarea_id=tarea.id, subtarea_id=s.id) }}">
+        {{ accion.hidden_tag() }}
+        <input type="hidden" name="hecho" value="{{ '0' if s.hecho else '1' }}">
+        <button class="btn btn-sm {{ 'btn-success' if s.hecho else 'btn-outline-secondary' }}" type="submit"
+                title="{{ 'Marcar como pendiente' if s.hecho else 'Marcar como hecho' }}">{{ '✓' if s.hecho else '○' }}</button>
+      </form>
+      {% else %}<span>{{ '✓' if s.hecho else '○' }}</span>{% endif %}
+      {% if s.fecha %}<span class="small text-nowrap">{{ s.fecha|fecha }}</span>{% endif %}
+      <span>{{ s.texto }}</span>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted">Sin subtareas.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% if ve_adjuntos %}
+<div class="card shadow-sm mb-3" id="adjuntos">
+  <div class="card-header fw-semibold">Archivos de respaldo</div>
+  <ul class="list-group list-group-flush">
+    {% for a in tarea.adjuntos %}
+    <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+      <a href="{{ url_for('tareas.descargar_adjunto', tarea_id=tarea.id, adjunto_id=a.id) }}">{{ a.nombre_original }}</a>
+      <span class="small text-muted">{{ (a.tamano / 1024)|round(1) }} KB · {{ a.subido_en|fecha_hora }}{% if a.subido_por %} · {{ a.subido_por.nombre_usuario }}{% endif %}</span>
+      {% if puede_editar %}
+      <form class="ms-auto" method="post" action="{{ url_for('tareas.quitar_adjunto', tarea_id=tarea.id, adjunto_id=a.id) }}"
+            data-confirmar="¿Quitar el archivo {{ a.nombre_original }}?">
+        {{ accion.hidden_tag() }}
+        <button class="btn btn-sm btn-outline-danger" type="submit">Quitar</button>
+      </form>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted">Sin archivos.</li>
+    {% endfor %}
+  </ul>
+  {% if puede_editar %}
+  <div class="card-body border-top">
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('tareas.subir_adjunto', tarea_id=tarea.id) }}"
+          class="d-flex flex-wrap gap-2 align-items-center">
+      {{ form_adjunto.hidden_tag() }}
+      {{ form_adjunto.archivo(class="form-control form-control-sm w-auto", **{'aria-label': 'Archivo de respaldo'}) }}
+      {{ form_adjunto.enviar(class="btn btn-sm btn-outline-primary") }}
+      <span class="small text-muted">Máximo {{ config.MAX_MB_ADJUNTO }} MB por archivo.</span>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<p class="small text-muted">
+  Creada {{ tarea.creado_en|fecha_hora }}{% if tarea.creado_por %} por {{ tarea.creado_por.nombre_usuario }}{% endif %}
+  · Actualizada {{ tarea.actualizado_en|fecha_hora }}{% if tarea.actualizado_por %} por {{ tarea.actualizado_por.nombre_usuario }}{% endif %}
+</p>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>{% endblock %}

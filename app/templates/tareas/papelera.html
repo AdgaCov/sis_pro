@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Papelera{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Papelera</h1>
+<p class="text-muted">Copia de las tareas eliminadas (últimas 200). Solo lectura.</p>
+
+{% if registros %}
+<div class="table-responsive">
+<table class="table table-sm align-middle bg-white">
+  <thead class="table-light">
+    <tr><th>Eliminada</th><th>Por</th><th>Código</th><th>Unidad</th><th>Tarea / asunto</th><th>Estado</th><th>Responsable</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for r in registros %}
+    {% set d = r.detalle or {} %}
+    <tr>
+      <td class="small text-nowrap">{{ r.fecha|fecha_hora }}</td>
+      <td class="small">{{ r.usuario.nombre_usuario if r.usuario else '—' }}</td>
+      <td class="font-monospace">{{ d.codigo }}</td>
+      <td>{{ d.unidad }}</td>
+      <td>{{ (d.asunto or '')|truncate(120) }}</td>
+      <td class="small">{{ d.estado }}</td>
+      <td class="small">{{ d.responsable or '—' }}</td>
+      <td>
+        <details>
+          <summary class="small">Ver todo</summary>
+          <dl class="small mb-0 mt-2">
+            {% for k, v in d.items() if v and k not in ('subtareas', 'adjuntos') %}
+              <dt>{{ k }}</dt><dd class="texto-largo">{{ v }}</dd>
+            {% endfor %}
+            {% if d.subtareas %}<dt>subtareas</dt><dd>{% for s in d.subtareas %}{{ '✓' if s.hecho else '○' }} {{ s.texto }}<br>{% endfor %}</dd>{% endif %}
+            {% if d.adjuntos %}<dt>adjuntos</dt><dd>{% for a in d.adjuntos %}{{ a.nombre }} <span class="text-muted">({{ a.ruta }})</span><br>{% endfor %}</dd>{% endif %}
+          </dl>
+        </details>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">La papelera está vacía.</p>
+{% endif %}
+{% endblock %}

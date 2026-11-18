@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block titulo %}Tareas{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">Tareas <span class="text-muted fs-6">({{ pagina.total }})</span></h1>
+  {% if puede_crear %}<a class="btn btn-primary" href="{{ url_for('tareas.nueva') }}">Nueva tarea</a>{% endif %}
+</div>
+
+<form method="get" class="card card-body py-2 mb-3 filtros">
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-md-3">
+      {{ filtro.texto.label(class="form-label small mb-0") }}
+      {{ filtro.texto(class="form-control form-control-sm", placeholder="Código, asunto, responsable, HR…") }}
+    </div>
+    {% if filtro.unidad_id.choices|length > 2 %}
+    <div class="col-6 col-md">
+      {{ filtro.unidad_id.label(class="form-label small mb-0") }}{{ filtro.unidad_id(class="form-select form-select-sm") }}
+    </div>
+    {% endif %}
+    <div class="col-6 col-md">
+      {{ filtro.tipo_id.label(class="form-label small mb-0") }}{{ filtro.tipo_id(class="form-select form-select-sm") }}
+    </div>
+    <div class="col-6 col-md">
+      {{ filtro.estado_id.label(class="form-label small mb-0") }}{{ filtro.estado_id(class="form-select form-select-sm") }}
+    </div>
+    <div class="col-6 col-md">
+      {{ filtro.prioridad_id.label(class="form-label small mb-0") }}{{ filtro.prioridad_id(class="form-select form-select-sm") }}
+    </div>
+    {% if filtro.responsable_id.choices|length > 1 %}
+    <div class="col-6 col-md">
+      {{ filtro.responsable_id.label(class="form-label small mb-0") }}{{ filtro.responsable_id(class="form-select form-select-sm") }}
+    </div>
+    {% endif %}
+    <div class="col-6 col-md-auto">
+      <div class="form-check mb-1">
+        {{ filtro.ver_concluidas(class="form-check-input") }}{{ filtro.ver_concluidas.label(class="form-check-label small") }}
+      </div>
+    </div>
+    <div class="col-12 col-md-auto">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Filtrar</button>
+      <a class="btn btn-sm btn-link" href="{{ url_for('tareas.lista') }}">Limpiar</a>
+    </div>
+  </div>
+</form>
+
+{% if pagina.items %}
+<div class="table-responsive">
+<table class="table table-sm table-hover align-middle bg-white tabla-tareas">
+  <thead class="table-light">
+    <tr>
+      <th>Código</th><th>Tipo</th><th>Tarea / asunto</th><th>Instancia MRE</th><th>Responsable</th>
+      <th>Inicio</th><th>Límite</th><th>Estado</th><th>Prioridad</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for t in pagina.items %}
+    <tr>
+      <td class="font-monospace text-nowrap"><a href="{{ url_for('tareas.detalle', tarea_id=t.id) }}">{{ t.codigo }}</a></td>
+      <td class="small">{{ t.tipo.valor }}</td>
+      <td class="asunto"><a class="text-reset text-decoration-none" href="{{ url_for('tareas.detalle', tarea_id=t.id) }}">{{ t.asunto|truncate(140) }}</a></td>
+      <td class="small">{{ t.instancia.valor if t.instancia else '' }}</td>
+      <td class="small">
+        {% if t.responsable %}{{ t.responsable.nombre }}{% if t.responsable.persona %}<br><span class="text-muted">{{ t.responsable.persona }}</span>{% endif %}
+        {% else %}<span class="text-danger">Sin responsable</span>{% endif %}
+      </td>
+      <td class="small text-nowrap">{{ t.fecha_solicitud|fecha }}</td>
+      <td class="small text-nowrap">{{ t.fecha_limite|fecha }}</td>
+      <td class="small">{{ t.estado.valor }}</td>
+      <td class="small">{{ t.prioridad.valor if t.prioridad else '' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pagina.pages > 1 %}
+<nav aria-label="Páginas">
+  <ul class="pagination pagination-sm">
+    {% set args = request.args.to_dict() %}
+    {% for n in pagina.iter_pages() %}
+      {% if n %}
+        {% set _ = args.update({'pagina': n}) %}
+        <li class="page-item {{ 'active' if n == pagina.page }}"><a class="page-link" href="{{ url_for('tareas.lista', **args) }}">{{ n }}</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% else %}
+<p class="text-muted">No hay tareas con estos filtros.</p>
+{% endif %}
+{% endblock %}

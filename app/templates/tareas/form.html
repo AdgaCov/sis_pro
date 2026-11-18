@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_macros.html" import campo %}
+{% block titulo %}{{ 'Editar ' ~ tarea.codigo if tarea else 'Nueva tarea' }}{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-3">
+  {% if tarea %}Editar tarea <span class="font-monospace">{{ tarea.codigo }}</span>{% else %}Nueva tarea{% endif %}
+</h1>
+
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Datos de la tarea</div>
+    <div class="card-body row g-3">
+      {% if current_user.ve_todo %}
+      <div class="col-md-6">
+        {{ campo(form.unidad_id) }}
+        {% if tarea %}<p class="form-text mt-n2">Si cambia la unidad, la tarea recibe un código nuevo de esa unidad.</p>{% endif %}
+      </div>
+      {% endif %}
+      <div class="col-md-6">{{ campo(form.tipo_id) }}</div>
+      <div class="col-md-6">{{ campo(form.area_id) }}</div>
+      <div class="col-md-6">{{ campo(form.instancia_id) }}</div>
+      <div class="col-12">{{ campo(form.asunto, rows=2) }}</div>
+      <div class="col-12">{{ campo(form.gestion_requerida, rows=2) }}</div>
+      <div class="col-md-6">
+        {{ campo(form.que_habilita, rows=2) }}
+        <p class="form-text mt-n2">Resultado esperado de la gestión.</p>
+      </div>
+      <div class="col-md-6">
+        {{ campo(form.habilita_a_id) }}
+        <p class="form-text mt-n2">Opcional: tarea que depende de esta.</p>
+      </div>
+      <div class="col-12">{{ campo(form.riesgo_demora) }}</div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Seguimiento</div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">{{ campo(form.responsable_id) }}</div>
+      <div class="col-md-6">{{ campo(form.hoja_ruta, placeholder="N.º de HR") }}</div>
+      <div class="col-md-4">{{ campo(form.fecha_solicitud) }}</div>
+      <div class="col-md-4">{{ campo(form.fecha_limite) }}</div>
+      <div class="col-md-4">{{ campo(form.estado_id) }}</div>
+      <div class="col-md-4">{{ campo(form.prioridad_id) }}</div>
+      <div class="col-md-4">{{ campo(form.nivel_riesgo) }}</div>
+      <div class="col-md-4">{{ campo(form.plazo_solucion) }}</div>
+      <div class="col-12">
+        {{ campo(form.linea_solucion, rows=2, placeholder="Ej.: DGE envía nota de insistencia a la DGAJ y se coordina reunión para subsanar observaciones") }}
+        <p class="form-text mt-n2">Acción concreta para destrabar la tarea: qué se hará, quién y ante quién.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3" id="subtareas">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+      <span>Subtareas / pasos</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="agregarPaso">Agregar paso</button>
+    </div>
+    <div class="card-body">
+      <div id="listaPasos" data-siguiente="{{ form.subtareas.entries|length }}" data-maximo="40">
+        {% for s in form.subtareas %}
+        <div class="row g-2 align-items-center mb-2 paso">
+          <div class="col-auto">{{ s.hecho(class="form-check-input", **{'aria-label': 'Hecho'}) }}</div>
+          <div class="col-4 col-md-2">{{ s.fecha(class="form-control form-control-sm", **{'aria-label': 'Fecha'}) }}</div>
+          <div class="col">{{ s.texto(class="form-control form-control-sm", maxlength=300, placeholder="Ej.: Obtener visto bueno de Despacho") }}</div>
+          <div class="col-auto"><button type="button" class="btn btn-sm btn-outline-secondary quitar-paso">Quitar</button></div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="form-text mb-0">Máximo 40 pasos. Los pasos sin texto no se guardan.</p>
+      <template id="plantillaPaso">
+        <div class="row g-2 align-items-center mb-2 paso">
+          <div class="col-auto"><input class="form-check-input" type="checkbox" name="subtareas-__i__-hecho" value="y" aria-label="Hecho"></div>
+          <div class="col-4 col-md-2"><input class="form-control form-control-sm" type="date" name="subtareas-__i__-fecha" aria-label="Fecha"></div>
+          <div class="col"><input class="form-control form-control-sm" type="text" name="subtareas-__i__-texto" maxlength="300" placeholder="Ej.: Obtener visto bueno de Despacho"></div>
+          <div class="col-auto"><button type="button" class="btn btn-sm btn-outline-secondary quitar-paso">Quitar</button></div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Resultado</div>
+    <div class="card-body row g-3">
+      <div class="col-md-8">{{ campo(form.resultado, rows=2, placeholder="Qué se logró: respuesta, autorización, documento emitido…") }}</div>
+      <div class="col-md-4">
+        {{ campo(form.fecha_conclusion) }}
+        <p class="form-text mt-n2">Se completa sola al marcar «Concluido».</p>
+      </div>
+      <div class="col-12">
+        {{ campo(form.medio_verificacion, rows=2, placeholder="Ej.: Nota CAR/BOLMUN-DGE-UDTP N.º 045/2026 · HR 12345 · Respuesta MRE de 03/11/2026") }}
+        <p class="form-text mt-n2">N.º de nota o CITE, hoja de ruta, acta, correo, resolución… Los archivos se adjuntan desde el detalle de la tarea.</p>
+      </div>
+      <div class="col-12">{{ campo(form.observaciones, rows=2) }}</div>
+    </div>
+  </div>
+
+  {{ form.enviar(class="btn btn-primary") }}
+  <a class="btn btn-link" href="{{ url_for('tareas.detalle', tarea_id=tarea.id) if tarea else url_for('tareas.lista') }}">Cancelar</a>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/subtareas.js') }}"></script>{% endblock %}

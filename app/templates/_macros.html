@@ -1,0 +1,8 @@
+{% macro campo(field) %}
+  <div class="mb-3">
+    {{ field.label(class="form-label") }}
+    {% set clase = "form-select" if field.type == "SelectField" else "form-control" %}
+    {{ field(class=clase ~ (" is-invalid" if field.errors else ""), **kwargs) }}
+    {% for e in field.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+  </div>
+{% endmacro %}

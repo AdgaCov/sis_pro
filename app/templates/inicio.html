@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Bienvenido, {{ current_user.nombre_completo }}</h1>
+<p class="text-muted">{{ current_user.nombre_rol }}{% if current_user.unidad %} · {{ current_user.unidad.nombre }}{% endif %}</p>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted">Unidades que puede ver</h2>
+        {% if unidades %}
+        <ul class="mb-0">
+          {% for u in unidades %}<li>{{ u.nombre }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="mb-0 text-muted">Ninguna. Pida a Planificación que configure su acceso.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted">Vistas disponibles</h2>
+        {% if vistas %}
+        <ul class="mb-0">
+          {% for v in vistas %}<li>{{ v|capitalize }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="mb-0 text-muted">Ninguna todavía.</p>
+        {% endif %}
+        {% if puede_ver_vista(current_user, 'tareas') %}
+        <a class="btn btn-primary btn-sm mt-3" href="{{ url_for('tareas.lista') }}">Ir a tareas</a>
+        {% endif %}
+        <p class="small text-muted mt-3 mb-0">Tablero e informes se habilitan en la próxima etapa.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

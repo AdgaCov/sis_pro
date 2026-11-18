@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimiento MRE · Bolivia en el Mundo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --azul:#1F3864; --azul-2:#2E4A7D; --fondo:#F4F6FA; --panel:#FFFFFF; --texto:#1B2333; --suave:#5B6478;
+    --borde:#DDE2EC; --rojo:#B42318; --rojo-f:#FDECEA; --ambar:#9A5B00; --ambar-f:#FFF4DE;
+    --verde:#1E7A46; --verde-f:#E6F4EC; --gris-f:#EEF0F4; --azul-f:#E8EEF8; --morado:#5B3A99; --morado-f:#F0EBFA;
+    --cian:#0E6973; --cian-f:#E3F4F5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
+  button,input,select,textarea{font:inherit}
+  .oculto{display:none!important}
+
+  .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  .login-caja{background:var(--panel);width:100%;max-width:380px;border-radius:10px;border:1px solid var(--borde);overflow:hidden}
+  .login-cab{background:var(--azul);color:#fff;padding:22px 24px}
+  .login-cab small{display:block;opacity:.8;letter-spacing:.06em;font-size:11px;margin-bottom:6px}
+  .login-cab h1{margin:0;font-size:19px;line-height:1.3}
+  .login form{padding:22px 24px;display:grid;gap:14px}
+  label{display:grid;gap:6px;font-size:12px;font-weight:bold;color:var(--suave);letter-spacing:.03em}
+  label.check{display:flex;align-items:center;gap:8px;font-weight:normal;color:var(--texto);letter-spacing:0;font-size:13px}
+  label.check input{width:auto}
+  input,select,textarea{border:1px solid var(--borde);border-radius:6px;padding:9px 10px;background:#fff;color:var(--texto);width:100%;min-width:0}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--azul-2);outline-offset:-1px;border-color:transparent}
+  textarea{min-height:60px;resize:vertical}
+  .btn{border:0;border-radius:6px;padding:9px 16px;cursor:pointer;background:var(--azul);color:#fff;font-weight:bold;white-space:nowrap}
+  .btn:hover{background:var(--azul-2)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .btn.sec{background:#fff;color:var(--azul);border:1px solid var(--borde)}
+  .btn.sec:hover{background:var(--azul-f)}
+  .btn.peligro{background:#fff;color:var(--rojo);border:1px solid #F1C3BE}
+  .btn.peq{padding:5px 10px;font-size:12px}
+  header .btn.nueva{background:#fff;color:var(--azul);font-weight:700}
+  .msg{font-size:13px;padding:9px 11px;border-radius:6px}
+  .enlace{background:none;border:0;color:var(--azul-2);text-decoration:underline;cursor:pointer;font-size:13px;justify-self:center;padding:4px}
+  .msg.error{background:var(--rojo-f);color:var(--rojo)}
+  .msg.ok{background:var(--verde-f);color:var(--verde)}
+  .msg.info{background:var(--azul-f);color:var(--azul)}
+
+  header{background:var(--azul);color:#fff}
+  .cab{max-width:1320px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .cab .marca{flex:1;min-width:200px}
+  .cab .marca small{display:block;opacity:.75;font-size:11px;letter-spacing:.06em}
+  .cab .marca b{font-size:16px}
+  .cab .usr{font-size:12px;opacity:.9}
+  .cab .btn{background:rgba(255,255,255,.12)}
+  .cab .btn:hover{background:rgba(255,255,255,.22)}
+  nav{background:#fff;border-bottom:1px solid var(--borde);position:sticky;top:0;z-index:5}
+  .tabs{max-width:1320px;margin:0 auto;padding:0 16px;display:flex;gap:2px;overflow-x:auto}
+  .tab{border:0;background:none;padding:12px 11px;cursor:pointer;color:var(--suave);font-weight:bold;border-bottom:3px solid transparent;white-space:nowrap}
+  .tab.activo{color:var(--azul);border-bottom-color:var(--azul)}
+  .tab .n{display:inline-block;min-width:18px;padding:1px 5px;border-radius:9px;background:var(--rojo);color:#fff;font-size:11px;margin-left:4px}
+  main{max-width:1320px;margin:0 auto;padding:18px 16px 40px}
+  h2{font-size:17px;margin:0 0 4px}
+  .sub{color:var(--suave);font-size:13px;margin:0 0 16px}
+  .barra{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px}
+  .barra .crece{flex:1;min-width:180px}
+  .barra label{min-width:140px}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+  .kpi{background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:12px 14px}
+  .kpi span{display:block;font-size:11px;color:var(--suave);font-weight:bold;letter-spacing:.04em}
+  .kpi b{font-size:26px;font-variant-numeric:tabular-nums}
+  .kpi.alerta b{color:var(--rojo)}
+
+  .tabla-env{background:var(--panel);border:1px solid var(--borde);border-radius:8px;overflow:auto;max-width:100%}
+  table{border-collapse:collapse;width:100%;min-width:980px}
+  th{background:var(--azul);color:#fff;text-align:left;font-size:11px;letter-spacing:.03em;padding:9px 10px;white-space:nowrap}
+  td{padding:9px 10px;border-top:1px solid var(--borde);vertical-align:top;font-size:13px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.clic{cursor:pointer}
+  tr.clic:hover td{background:#FAFBFD}
+  td.tarea{min-width:240px;max-width:360px}
+  td.tarea small{display:block;color:var(--suave);margin-top:3px}
+  td.largo{min-width:170px;max-width:260px;color:var(--suave)}
+  td.estado{min-width:140px}
+  .vacio{padding:28px;text-align:center;color:var(--suave)}
+
+  .chip{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:bold;white-space:nowrap}
+  .a-VENCIDO{background:var(--rojo);color:#fff}
+  .a-CRITICO{background:var(--rojo-f);color:var(--rojo)}
+  .a-POR-VENCER{background:var(--ambar-f);color:var(--ambar);box-shadow:inset 0 0 0 1px #E8C27A}
+  .a-SEGUIMIENTO{background:var(--ambar-f);color:var(--ambar)}
+  .a-EN-CURSO{background:var(--azul-f);color:var(--azul)}
+  .a-CONCLUIDO{background:var(--verde-f);color:var(--verde)}
+  .a-SIN-FECHA{background:var(--gris-f);color:var(--suave)}
+  .t-0{background:var(--gris-f);color:#3E4659}
+  .t-1{background:var(--azul-f);color:var(--azul)}
+  .t-2{background:var(--morado-f);color:var(--morado)}
+  .t-3{background:var(--cian-f);color:var(--cian)}
+  .prio-Alta{color:var(--rojo);font-weight:bold}
+  .marca-sm{font-size:11px;color:var(--suave)}
+
+  .seccion{margin-top:22px}
+  .seccion h3{font-size:14px;margin:0 0 10px;color:var(--azul);letter-spacing:.03em}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+  /* alertas */
+  .al-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .al-caja{background:var(--panel);border:1px solid var(--borde);border-radius:8px;overflow:hidden}
+  .al-cab{padding:10px 14px;font-weight:bold;font-size:13px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--borde)}
+  .al-cab small{display:block;font-weight:normal;color:var(--suave);font-size:12px;margin-top:2px}
+  .al-cab b{font-size:20px}
+  .al-cab.r{border-left:4px solid var(--rojo)} .al-cab.a{border-left:4px solid #D49A2A} .al-cab.g{border-left:4px solid #8A93A6} .al-cab.c{border-left:4px solid var(--cian)}
+  .al-item{padding:9px 14px;border-top:1px solid var(--borde);cursor:pointer;display:grid;gap:3px}
+  .al-item:first-of-type{border-top:0}
+  .al-item:hover{background:#FAFBFD}
+  .al-item .l1{font-size:13px}
+  .al-item .l2{font-size:12px;color:var(--suave)}
+  .al-vacio{padding:14px;color:var(--suave);font-size:13px}
+
+  /* cronograma */
+  .gantt{background:var(--panel);border:1px solid var(--borde);border-radius:8px;overflow:auto}
+  .g-in{min-width:900px;position:relative}
+  .g-fila{display:grid;grid-template-columns:280px 1fr;border-top:1px solid var(--borde);min-height:38px}
+  .g-fila.g-cab{border-top:0;background:var(--azul);color:#fff;font-size:11px;font-weight:bold;min-height:30px}
+  .g-fila.grupo{background:var(--gris-f);font-weight:bold;font-size:12px;color:var(--azul);min-height:28px}
+  .g-et{padding:7px 10px;font-size:12px;border-right:1px solid var(--borde);overflow:hidden}
+  .g-fila.g-cab .g-et{border-right-color:rgba(255,255,255,.2);padding-top:8px}
+  .g-et b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .g-et small{color:var(--suave)}
+  .g-pista{position:relative}
+  .g-mes{position:absolute;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.25);padding:8px 0 0 5px;white-space:nowrap}
+  .g-linea{position:absolute;top:0;bottom:0;border-left:1px dashed var(--borde)}
+  .g-hoy{position:absolute;top:0;bottom:0;border-left:2px solid var(--rojo);z-index:2;pointer-events:none}
+  .g-hoy span{position:absolute;top:2px;left:4px;font-size:10px;color:var(--rojo);font-weight:bold;background:#fff;padding:0 3px;border-radius:3px}
+  .g-barra{position:absolute;top:10px;height:18px;border-radius:4px;cursor:pointer;min-width:6px;font-size:10px;color:#fff;padding:2px 6px;white-space:nowrap;overflow:hidden}
+  .g-barra.abierta{background-image:linear-gradient(90deg,transparent 70%,rgba(255,255,255,.45))}
+  .g-sub{position:absolute;top:13px;width:11px;height:11px;border-radius:50%;margin-left:-5px;background:#fff;border:2px solid #1B2333;z-index:2;cursor:pointer}
+  .g-sub.ok{background:var(--verde)} .g-sub.venc{background:#FFD23F}
+  .g-hito{position:absolute;top:12px;width:13px;height:13px;transform:rotate(45deg);border:2px solid var(--texto);background:#fff;margin-left:-6px;z-index:1}
+  .g-ley{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0;font-size:12px;color:var(--suave);align-items:center}
+  .g-ley i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .c-VENCIDO{background:#B42318}.c-CRITICO{background:#D9534F}.c-POR-VENCER{background:#D49A2A}.c-SEGUIMIENTO{background:#E3B25A}
+  .c-EN-CURSO{background:#2E4A7D}.c-CONCLUIDO{background:#3B9A63}.c-SIN-FECHA{background:#8A93A6}
+
+  dialog{border:0;border-radius:10px;padding:0;width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+  dialog::backdrop{background:rgba(15,25,45,.45)}
+  dialog form{display:flex;flex-direction:column;max-height:calc(100vh - 24px)}
+  .dlg-cab{background:var(--azul);color:#fff;padding:14px 18px;font-weight:bold}
+  .dlg-cuerpo{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:auto}
+  .dlg-cuerpo .ancho{grid-column:1/-1}
+  .dlg-cuerpo h4{grid-column:1/-1;margin:6px 0 0;font-size:12px;color:var(--azul);letter-spacing:.05em;border-bottom:1px solid var(--borde);padding-bottom:5px}
+  .dlg-pie{padding:12px 18px;border-top:1px solid var(--borde);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .dlg-pie .izq{margin-right:auto}
+  .ayuda{font-weight:normal;color:var(--suave);font-size:11px;letter-spacing:0}
+
+  .cargando{position:fixed;inset:0;background:rgba(244,246,250,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+  .rueda{width:34px;height:34px;border:4px solid var(--borde);border-top-color:var(--azul);border-radius:50%;animation:g .8s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+  .aviso{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px)}
+
+  /* medios de verificación */
+  .adj{grid-column:1/-1;display:grid;gap:6px}
+  .sub{grid-column:1/-1;display:grid;gap:6px}
+  .sub-item{display:grid;grid-template-columns:auto 150px 1fr auto;gap:8px;align-items:center}
+  .sub-item input[type=checkbox]{width:18px;height:18px}
+  .sub-item.hecho input[type=text]{text-decoration:line-through;color:var(--suave)}
+  .sub-item.vencida input[type=date]{border-color:var(--rojo);color:var(--rojo)}
+  @media (max-width:760px){ .sub-item{grid-template-columns:auto 1fr auto} .sub-item input[type=text]{grid-column:1/-1;grid-row:2} }
+  .adj-item{display:flex;gap:8px;align-items:center;border:1px solid var(--borde);border-radius:6px;padding:6px 10px;font-size:13px}
+  .adj-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .adj-subir{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--suave)}
+  .adj-subir input[type=file]{width:auto;border:1px dashed var(--borde)}
+  .descargas{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* reporte para imprimir / PDF */
+  #reporte{display:none}
+  @media print{
+    @page{size:A4 landscape;margin:12mm}
+    body{background:#fff}
+    #vApp,#vLogin,dialog,.aviso,.cargando{display:none!important}
+    #reporte{display:block;color:#000;font-size:10px}
+    #reporte h1{font-size:15px;margin:0 0 2px;color:#1F3864}
+    #reporte .r-sub{margin:0 0 8px;color:#444}
+    #reporte .r-kpi{display:flex;gap:16px;margin:0 0 8px;font-size:11px}
+    #reporte table{min-width:0;width:100%;border-collapse:collapse}
+    #reporte th{background:#1F3864!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:9px;padding:4px;white-space:normal}
+    #reporte td{border:1px solid #bbb;padding:4px;font-size:9px;vertical-align:top}
+    #reporte tr{page-break-inside:avoid}
+    #reporte .r-pie{margin-top:8px;color:#555;font-size:9px}
+    #reporte h2{font-size:12px;margin:12px 0 4px;color:#1F3864}
+  }
+
+  @media (max-width:760px){
+    .dlg-cuerpo{grid-template-columns:1fr}
+    .dos{grid-template-columns:1fr}
+    .kpi b{font-size:22px}
+    .cab .usr{width:100%}
+    .g-fila{grid-template-columns:170px 1fr}
+    .al-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<section id="vLogin" class="login">
+  <div class="login-caja">
+    <div class="login-cab">
+      <small>BOLIVIA EN EL MUNDO</small>
+      <h1>Seguimiento de tareas y trámites con el MRE</h1>
+    </div>
+    <form id="fLogin">
+      <label>USUARIO
+        <select id="lUsuario" required>
+          <option value="">Seleccione su unidad…</option>
+          <option>PLANIFICACION</option><option>DGE</option><option>DGE-STAF</option><option>UAF</option>
+          <option>UPT</option><option>UDTP</option><option>UEP</option><option>SISTEMAS</option>
+        </select>
+      </label>
+      <label>CONTRASEÑA <input id="lClave" type="password" autocomplete="current-password" required></label>
+      <div id="lMsg" class="msg error oculto"></div>
+      <button class="btn" id="lBtn" type="submit">Ingresar</button>
+      <button class="enlace" id="lOlvido" type="button">¿Olvidó su contraseña?</button>
+    </form>
+  </div>
+</section>
+
+<section id="vApp" class="oculto">
+  <header>
+    <div class="cab">
+      <div class="marca"><small>BOLIVIA EN EL MUNDO · SEGUIMIENTO MRE</small><b id="aTitulo">—</b></div>
+      <span class="usr" id="aUsr"></span>
+      <button class="btn peq nueva" id="bNuevaG" title="Registrar una tarea en cualquier pestaña">+ Nueva tarea</button>
+      <button class="btn peq oculto" id="bProyectos" title="Fichas de seguimiento semanal de proyectos">Proyectos</button>
+      <button class="btn peq" id="bRecargar" title="Traer los últimos cambios">Actualizar</button>
+      <button class="btn peq" id="bClave">Cambiar contraseña</button>
+      <button class="btn peq" id="bSalir">Salir</button>
+    </div>
+  </header>
+  <nav><div class="tabs" id="tabs"></div></nav>
+  <main id="contenido"></main>
+</section>
+
+<!-- Diálogo tarea -->
+<dialog id="dTarea">
+  <form id="fTarea" method="dialog">
+    <div class="dlg-cab" id="dtTitulo">Nueva tarea</div>
+    <div class="dlg-cuerpo">
+      <label id="dtUnidadL" class="ancho">UNIDAD <select name="unidad"></select></label>
+      <label>TIPO * <select name="tipo" required></select></label>
+      <label>ÁREA FUNCIONAL <select name="area"></select></label>
+      <label id="dtInstL">INSTANCIA DEL MRE <select name="instancia"></select></label>
+      <label class="ancho">TAREA / ASUNTO * <textarea name="tarea" required></textarea></label>
+      <label class="ancho">GESTIÓN REQUERIDA / ACCIÓN <textarea name="gestion"></textarea></label>
+      <label class="ancho">¿QUÉ HABILITA? <span class="ayuda">Resultado esperado de la gestión</span><textarea name="habilita"></textarea></label>
+      <label>HABILITA LA TAREA <span class="ayuda">Opcional: tarea que depende de esta</span><select name="habilitaA"></select></label>
+      <label>RIESGO POR DEMORA <input name="riesgo"></label>
+      <h4>SUBTAREAS / PASOS <span class="ayuda" style="text-transform:none;font-weight:400">Acciones que componen la tarea, con su fecha. Pasan solas a la Agenda Despacho.</span></h4>
+      <div class="sub" id="dtSub"></div>
+      <h4>RESPONSABLE Y PLAZOS</h4>
+      <label>RESPONSABLE (CARGO) <select name="responsable"></select></label>
+      <label>HOJA DE RUTA <input name="hojaRuta" placeholder="N° de HR"></label>
+      <label>FECHA SOLICITUD / INICIO <input name="fechaSol" type="date"></label>
+      <label>FECHA LÍMITE <input name="fechaLim" type="date"></label>
+      <label>ESTADO <select name="estado"></select></label>
+      <label>PRIORIDAD <select name="prioridad"></select></label>
+      <h4>RIESGO Y LÍNEA DE SOLUCIÓN</h4>
+      <label>NIVEL DE RIESGO <select name="nivelRiesgo"></select></label>
+      <label>PLAZO DE LA SOLUCIÓN <input name="plazoSolucion" type="date"></label>
+      <label class="ancho">LÍNEA DE SOLUCIÓN <span class="ayuda">Acción concreta para destrabar la tarea: qué se hará, quién y ante quién</span><textarea name="solucion" placeholder="Ej.: DGE envía nota de insistencia a la DGAJ y se coordina reunión para subsanar observaciones"></textarea></label>
+      <h4>RESULTADO</h4>
+      <label class="ancho">RESULTADO OBTENIDO <textarea name="resultado" placeholder="Qué se logró: respuesta, autorización, documento emitido…"></textarea></label>
+      <label>FECHA CONCLUSIÓN <span class="ayuda">Se completa sola al marcar «Concluido»</span><input name="fechaFin" type="date"></label>
+      <h4>MEDIOS DE VERIFICACIÓN</h4>
+      <label class="ancho">DESCRIPCIÓN DEL RESPALDO <span class="ayuda">N.º de nota o CITE, hoja de ruta, acta, correo, resolución…</span><textarea name="medio" placeholder="Ej.: Nota CAR/BOLMUN-DGE-UDTP N.º 045/2026 · HR 12345 · Respuesta MRE de 03/11/2026"></textarea></label>
+      <div class="adj" id="dtAdj"></div>
+      <label class="ancho">OBSERVACIONES <textarea name="obs"></textarea></label>
+      <p class="ancho marca-sm" id="dtAct" style="margin:0"></p>
+      <div id="dtMsg" class="msg error oculto ancho"></div>
+    </div>
+    <div class="dlg-pie">
+      <button type="button" class="btn peligro izq oculto" id="dtBorrar">Eliminar</button>
+      <button type="button" class="btn sec" id="dtCancelar">Cancelar</button>
+      <button type="submit" class="btn" id="dtGuardar">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo clave -->
+<dialog id="dClave">
+  <form id="fClave" method="dialog">
+    <div class="dlg-cab" id="dcTitulo">Cambiar contraseña</div>
+    <div class="dlg-cuerpo">
+      <p class="ancho sub" id="dcNota" style="margin:0"></p>
+      <label class="ancho">CONTRASEÑA ACTUAL <input name="actual" type="password" autocomplete="current-password" required></label>
+      <label>NUEVA CONTRASEÑA <input name="nueva" type="password" autocomplete="new-password" required></label>
+      <label>REPETIR NUEVA <input name="repetir" type="password" autocomplete="new-password" required></label>
+      <div id="dcMsg" class="msg error oculto ancho"></div>
+    </div>
+    <div class="dlg-pie">
+      <button type="button" class="btn sec" id="dcCancelar">Cancelar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo recuperar contraseña -->
+<dialog id="dRecup">
+  <form id="fRecup" method="dialog">
+    <div class="dlg-cab">Recuperar contraseña</div>
+    <div class="dlg-cuerpo">
+      <label class="ancho">USUARIO
+        <select name="usuario" required>
+          <option value="">Seleccione…</option>
+          <option>PLANIFICACION</option><option>DGE</option><option>DGE-STAF</option><option>UAF</option>
+          <option>UPT</option><option>UDTP</option><option>UEP</option><option>SISTEMAS</option>
+        </select>
+      </label>
+      <div class="ancho" id="rPaso1"><button type="button" class="btn" id="rEnviar">Enviar código</button></div>
+      <div id="rInfo" class="msg info oculto ancho"></div>
+      <div id="rPaso2" class="oculto ancho" style="display:grid;gap:12px">
+        <label>CÓDIGO RECIBIDO POR CORREO <input name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>
+        <label>NUEVA CONTRASEÑA <input name="nueva" type="password" autocomplete="new-password"></label>
+        <label>REPETIR NUEVA <input name="repetir" type="password" autocomplete="new-password"></label>
+      </div>
+      <div id="rMsg" class="msg error oculto ancho"></div>
+    </div>
+    <div class="dlg-pie">
+      <button type="button" class="btn sec" id="rCerrar">Cerrar</button>
+      <button type="submit" class="btn oculto" id="rGuardar">Guardar contraseña</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="reporte" aria-hidden="true"></div>
+<div id="cargando" class="cargando oculto"><div class="rueda"></div></div>
+<div id="aviso" class="aviso msg ok oculto"></div>
+
+<script>
+var S = { token:null, perfil:null, vista:null, d:null, f:{} };
+var $ = function(id){ return document.getElementById(id); };
+var ORDEN = {'VENCIDO':0,'CRÍTICO':1,'POR VENCER':2,'SEGUIMIENTO':3,'SIN FECHA':4,'EN CURSO':5,'CONCLUIDO':6};
+var ALERTAS = ['VENCIDO','CRÍTICO','POR VENCER','SEGUIMIENTO','SIN FECHA','EN CURSO','CONCLUIDO'];
+
+function guardarToken(t){ try{ t ? sessionStorage.setItem('mre_tok2', t) : sessionStorage.removeItem('mre_tok2'); }catch(e){} }
+function leerToken(){ try{ return sessionStorage.getItem('mre_tok2'); }catch(e){ return null; } }
+
+function srv(fn){
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(ok, mal){
+    google.script.run.withSuccessHandler(ok).withFailureHandler(function(e){
+      var m = (e && e.message) || String(e);
+      if (m.indexOf('SESION:') >= 0) salirLocal(m.replace(/^.*SESION:\s*/, ''));
+      mal(new Error(m.replace(/^(Error|Exception):\s*/, '')));
+    })[fn].apply(null, args);
+  });
+}
+function cargando(si){ $('cargando').classList.toggle('oculto', !si); }
+function aviso(txt){ var a=$('aviso'); a.textContent=txt; a.classList.remove('oculto'); clearTimeout(aviso.t); aviso.t=setTimeout(function(){a.classList.add('oculto');},2600); }
+function mostrarError(el, txt){ el.textContent = txt||''; el.classList.toggle('oculto', !txt); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fTxt(iso){ if(!iso) return '—'; var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function claseA(a){ return 'a-'+String(a).replace('Í','I').replace(/ /g,'-'); }
+function claseC(a){ return 'c-'+String(a).replace('Í','I').replace(/ /g,'-'); }
+function chipA(a){ return '<span class="chip '+claseA(a)+'">'+esc(a)+'</span>'; }
+function idxTipo(t){ var i = S.perfil.cat.TIPOS.indexOf(t); return i<0?0:Math.min(i,3); }
+function tipoCorto(t){ if(t===S.perfil.tipoInterna) return 'Interna'; if(/^Solicitud/i.test(t)) return 'Solicitud'; if(/^Autoriz/i.test(t)) return 'Autorización'; if(/^Gesti/i.test(t)) return 'Gestión MRE'; return t||'—'; }
+function chipT(t){ return '<span class="chip t-'+idxTipo(t)+'" title="'+esc(t)+'">'+esc(tipoCorto(t))+'</span>'; }
+function opts(lista, valor, vacio){
+  var l = lista.slice(); if (valor && l.indexOf(valor)<0) l.push(valor);
+  return (vacio!==false?'<option value="">'+(vacio||'—')+'</option>':'') + l.map(function(o){
+    var v = typeof o==='object'?o.v:o, t = typeof o==='object'?o.t:o;
+    return '<option value="'+esc(v)+'"'+(v===valor?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
+}
+function porSeveridad(a,b){ return (ORDEN[a.alerta]-ORDEN[b.alerta]) || ((a.faltan===''?999:a.faltan)-(b.faltan===''?999:b.faltan)) || ((b.dias||0)-(a.dias||0)); }
+function persona(unidad, cargo){ var m = String(cargo||'').match(/^(.+?) · (.+)$/); if (m && S.perfil.unidades.concat(UNIDADES_ALL()).some(function(u){ return u.usuario===m[1]; })){ unidad=m[1]; cargo=m[2]; } var r = S.d && S.d.responsables.filter(function(x){ return x.unidad===unidad && x.cargo===cargo; })[0]; return r && r.nombre ? r.nombre : ''; }
+function respSigla(t){ if(!t.responsable) return ''; var m = String(t.responsable).match(/^(.+?) · (.+)$/); return m ? m[1]+' - '+m[2] : t.unidad+' - '+t.responsable; }
+function respTxt(t){ if(!t.responsable) return ''; var n = persona(t.unidad, t.responsable); return respSigla(t) + (n ? ' ('+n+')' : ''); }
+function filtroTxt(f){
+  var p = [];
+  if (f.tipo) p.push('Tipo: '+f.tipo); if (f.resp) p.push('Responsable: '+f.resp); if (f.inst) p.push('Instancia: '+f.inst);
+  if (f.alerta) p.push('Alerta: '+f.alerta); if (f.txt) p.push('Búsqueda: «'+f.txt+'»'); p.push(f.concl ? 'incluye concluidas' : 'solo abiertas');
+  return p.join(' · ');
+}
+function nombreUnidad(u){ var x=S.perfil.unidades.filter(function(y){return y.usuario===u;})[0]; return x?x.nombre:u; }
+function filtro(v, def){ return S.f[v] = S.f[v] || def; }
+function coincide(t, txt){ return !txt || (t.id+' '+t.tarea+' '+t.instancia+' '+t.gestion+' '+t.responsable+' '+t.hojaRuta+' '+t.resultado+' '+t.obs).toLowerCase().indexOf(txt.toLowerCase())>=0; }
+
+/* ---------- ingreso ---------- */
+$('fLogin').addEventListener('submit', function(ev){
+  ev.preventDefault(); mostrarError($('lMsg'), ''); $('lBtn').disabled = true;
+  srv('login', $('lUsuario').value, $('lClave').value).then(function(r){
+    $('lClave').value=''; if (r.irProyectos) { window.open(r.irProyectos, '_top'); return; } S.token = r.token; guardarToken(r.token); delete r.token; iniciar(r);
+  }).catch(function(e){ mostrarError($('lMsg'), e.message); }).finally(function(){ $('lBtn').disabled = false; });
+});
+
+function iniciar(perfil){
+  S.perfil = perfil;
+  $('vLogin').classList.add('oculto'); $('vApp').classList.remove('oculto');
+  $('aUsr').textContent = 'Usuario: ' + perfil.usuario;
+  $('aTitulo').textContent = perfil.esPlan ? (perfil.etiqueta || 'Planificación')+' · Todas las unidades' : perfil.unidades[0].nombre;
+  $('bProyectos').classList.toggle('oculto', !perfil.urlProyectos);
+  var t = [];
+  if (perfil.esPlan){
+    t.push({id:'RESUMEN', txt:'Resumen ejecutivo'}, {id:'INFORME', txt:'Informe crítico'}, {id:'ALERTAS', txt:'Alertas'}, {id:'CRONO', txt:'Cronograma'});
+    perfil.unidades.forEach(function(u){ t.push({id:'U:'+u.usuario, txt:u.usuario}); });
+    t.push({id:'RESP', txt:'Responsables'}, {id:'USUARIOS', txt:'Usuarios'});
+  } else {
+    t.push({id:'U:'+perfil.unidades[0].usuario, txt:'Mis tareas'}, {id:'INFORME', txt:'Informe crítico'}, {id:'ALERTAS', txt:'Alertas'}, {id:'CRONO', txt:'Cronograma'}, {id:'RESP', txt:'Responsables'});
+  }
+  S.tabs = t;
+  recargar(t[0].id);
+  if (perfil.debeCambiar) abrirClave(true);
+}
+function pintarTabs(){
+  var nAl = S.d ? S.d.tareas.filter(function(x){ return x.alerta==='VENCIDO'||x.alerta==='CRÍTICO'||x.alerta==='POR VENCER'; }).length : 0;
+  $('tabs').innerHTML = S.tabs.map(function(t){
+    return '<button class="tab'+(t.id===S.vista?' activo':'')+'" data-v="'+esc(t.id)+'">'+esc(t.txt)+(t.id==='ALERTAS'&&nAl?'<span class="n">'+nAl+'</span>':'')+'</button>';
+  }).join('');
+}
+$('tabs').addEventListener('click', function(ev){ var b = ev.target.closest('.tab'); if (b) ir(b.dataset.v); });
+
+function recargar(vista){
+  cargando(true);
+  return srv('obtenerDatos', S.token).then(function(d){ S.d = d; ir(vista || S.vista); })
+    .catch(function(e){ $('contenido').innerHTML = '<div class="msg error">'+esc(e.message)+'</div>'; })
+    .finally(function(){ cargando(false); });
+}
+$('bRecargar').addEventListener('click', function(){ recargar(); });
+$('bProyectos').addEventListener('click', function(){ srv('irA', S.token, 'proyectos').then(function(u){ window.open(u, '_top'); }).catch(function(e){ aviso(e.message); }); });
+// «+ Nueva tarea» siempre visible: en la pestaña de una unidad propone esa unidad; si no, la primera (DGE y Planificación pueden cambiarla en la ficha)
+$('bNuevaG').addEventListener('click', function(){
+  var u = /^U:/.test(S.vista || '') ? S.vista.slice(2) : S.perfil.unidades[0].usuario;
+  abrirTarea(null, u);
+});
+
+function ir(v){
+  S.vista = v; pintarTabs();
+  if (v==='USUARIOS'){ cargando(true); srv('listarUsuarios', S.token).then(pintarUsuarios).catch(function(e){ $('contenido').innerHTML='<div class="msg error">'+esc(e.message)+'</div>'; }).finally(function(){cargando(false);}); return; }
+  if (v==='RESUMEN') return pintarResumen();
+  if (v==='ALERTAS') return pintarAlertas();
+  if (v==='INFORME') return pintarInforme();
+  if (v==='CRONO') return pintarCrono();
+  if (v==='RESP') return pintarResp();
+  if (v.indexOf('U:')===0) return pintarUnidad(v.slice(2));
+}
+
+function salirLocal(msg){
+  S.token = null; S.d = null; guardarToken(null);
+  ['dTarea','dClave'].forEach(function(id){ if ($(id).open) $(id).close(); });
+  $('vApp').classList.add('oculto'); $('vLogin').classList.remove('oculto');
+  if (msg) mostrarError($('lMsg'), msg);
+}
+$('bSalir').addEventListener('click', function(){ var t=S.token; salirLocal(); srv('cerrarSesion', t).catch(function(){}); });
+
+/* clics delegados (una sola vez) */
+$('contenido').addEventListener('click', function(ev){
+  var r = ev.target.closest('[data-id]');
+  if (r && S.d){ var t = S.d.tareas.filter(function(x){ return x.id===r.dataset.id; })[0]; if (t && !$('dTarea').open) abrirTarea(t); return; }
+  var b = ev.target.closest('[data-ru]');
+  if (!b) return;
+  var u = b.dataset.ru, c = b.dataset.rc, p;
+  if (b.dataset.acc==='nombre'){
+    var inp = $('contenido').querySelector('input[data-rn="'+CSS.escape(u+'|'+c)+'"]');
+    p = srv('guardarResponsable', S.token, u, c, inp.value).then(function(d){ S.d=d; pintarResp(); aviso('Persona designada guardada'); });
+  } else if (b.dataset.acc==='mover'){
+    var sel = $('contenido').querySelector('select[data-rm="'+CSS.escape(u+'|'+c)+'"]');
+    if (!sel.value) return;
+    p = srv('moverResponsable', S.token, u, c, sel.value).then(function(d){ S.d=d; pintarResp(); aviso('Cargo movido a '+sel.value); });
+  } else {
+    p = srv('cambiarResponsable', S.token, u, c, b.dataset.acc==='on').then(function(d){ S.d=d; pintarResp(); });
+  }
+  p.catch(function(e){ mostrarError($('rpMsg'), e.message); });
+});
+
+/* ---------- reutilizables ---------- */
+function kpis(items){
+  return '<div class="kpis">'+items.map(function(k){ return '<div class="kpi'+(k[2]?' alerta':'')+'"><span>'+esc(k[0])+'</span><b>'+k[1]+'</b></div>'; }).join('')+'</div>';
+}
+function enlazarFiltros(vista, repintar){
+  Array.prototype.forEach.call($('contenido').querySelectorAll('[data-f]'), function(el){
+    var ev = el.tagName==='INPUT' && el.type==='text' ? 'input' : 'change';
+    el.addEventListener(ev, function(){
+      S.f[vista][el.dataset.f] = el.type==='checkbox' ? el.checked : el.value;
+      var pos = el.selectionStart; repintar();
+      if (ev==='input'){ var n=$('contenido').querySelector('[data-f="'+el.dataset.f+'"]'); n.focus(); try{ n.setSelectionRange(pos,pos);}catch(e){} }
+    });
+  });
+}
+function selUnidad(f){ return S.perfil.esPlan ? '<label>UNIDAD <select data-f="unidad">'+opts(S.perfil.unidades.map(function(u){return u.usuario;}), f.unidad, 'Todas')+'</select></label>' : ''; }
+function selTipo(f, lista){ return '<label>TIPO <select data-f="tipo">'+opts(lista||S.perfil.cat.TIPOS, f.tipo, 'Todos')+'</select></label>'; }
+function selResp(f, tareas){
+  var l = []; tareas.forEach(function(t){ if (t.responsable && l.indexOf(t.responsable)<0) l.push(t.responsable); }); l.sort();
+  return '<label>RESPONSABLE <select data-f="resp">'+opts(l, f.resp, 'Todos')+'</select></label>';
+}
+function UNIDADES_ALL(){ return (S.d && S.d.responsables ? S.d.responsables : []).map(function(r){ return {usuario:r.unidad}; }); }
+function selArea(f){ return (S.perfil.cat.AREAS||[]).length ? '<label>ÁREA FUNCIONAL <select data-f="area">'+opts(S.perfil.cat.AREAS, f.area, 'Todas')+'</select></label>' : ''; }
+function selAlerta(f){ return '<label>ALERTA <select data-f="alerta">'+opts(ALERTAS, f.alerta, 'Todas')+'</select></label>'; }
+function aplicar(tareas, f){
+  return tareas.filter(function(t){
+    return (!f.unidad||t.unidad===f.unidad) && (!f.tipo||t.tipo===f.tipo) && (!f.resp||t.responsable===f.resp) &&
+      (!f.alerta||t.alerta===f.alerta) && (!f.area||t.area===f.area) && (!f.inst||t.instancia===f.inst) && (f.concl!==false||!t.concluida) && coincide(t, f.txt);
+  });
+}
+
+/* ---------- tareas de una unidad ---------- */
+function pintarUnidad(u){
+  var v='U:'+u, f = filtro(v, {txt:'', tipo:'', resp:'', alerta:'', concl:false});
+  var todas = S.d.tareas.filter(function(t){ return t.unidad===u; });
+  var abiertas = todas.filter(function(t){ return !t.concluida; });
+  var lista = aplicar(todas, f).sort(porSeveridad);
+  $('contenido').innerHTML =
+    '<h2>'+esc(nombreUnidad(u))+'</h2><p class="sub">Registre aquí todas las tareas de la unidad. Solo las solicitudes, autorizaciones y gestiones con el MRE pasan al Resumen ejecutivo.</p>'+
+    kpis([['TAREAS INTERNAS PENDIENTES', abiertas.filter(function(t){return !t.mre;}).length],
+          ['GESTIONES CON EL MRE PENDIENTES', abiertas.filter(function(t){return t.mre;}).length],
+          ['VENCIDAS', abiertas.filter(function(t){return t.alerta==='VENCIDO';}).length, 1],
+          ['SIN RESPONSABLE', abiertas.filter(function(t){return t.sinResponsable;}).length, 1],
+          ['CONCLUIDAS', todas.length-abiertas.length]])+
+    '<div class="barra"><label class="crece">BUSCAR <input type="text" data-f="txt" value="'+esc(f.txt)+'" placeholder="Tarea, responsable, HR, resultado…"></label>'+
+      selTipo(f)+selArea(f)+selResp(f, todas)+selAlerta(f)+
+      '<label class="check"><input type="checkbox" data-f="concl"'+(f.concl?' checked':'')+'> Ver concluidas</label>'+
+      '<button class="btn" id="bNueva">+ Nueva tarea</button></div>'+
+    '<div class="barra" style="justify-content:space-between"><span class="marca-sm">'+lista.length+' tareas en pantalla. La descarga incluye lo que muestra el filtro.</span>'+barraDescargas()+'</div>'+
+    tablaTareas(lista, false, todas.length ? 'Ninguna tarea coincide con el filtro.' : 'Aún no hay tareas. Use «+ Nueva tarea».');
+  enlazarFiltros(v, function(){ pintarUnidad(u); });
+  $('bNueva').addEventListener('click', function(){ abrirTarea(null, u); });
+  enlazarDescargas(function(){
+    var ab = todas.filter(function(t){ return !t.concluida; });
+    return { titulo: 'Resumen de tareas · '+nombreUnidad(u), sub: filtroTxt(f), archivo: 'Resumen_'+u, lista: lista, conUnidad: false,
+      kpis: [['Tareas internas pendientes', ab.filter(function(t){return !t.mre;}).length], ['Gestiones con el MRE pendientes', ab.filter(function(t){return t.mre;}).length],
+             ['Vencidas', ab.filter(function(t){return t.alerta==='VENCIDO';}).length], ['Concluidas', todas.length-ab.length],
+             ['Concluidas sin medio de verificación', todas.filter(function(t){return t.sinRespaldo;}).length]] };
+  });
+}
+function tablaTareas(lista, conUnidad, vacio){
+  return '<div class="tabla-env"><table><thead><tr>'+(conUnidad?'<th>UNIDAD</th>':'')+
+    '<th>ID</th><th>TIPO</th><th>TAREA / ASUNTO</th><th>INSTANCIA MRE</th><th>RESPONSABLE</th><th>INICIO</th><th>LÍMITE</th><th>ESTADO</th><th>PRIORIDAD</th><th>ALERTA</th><th>RESULTADO</th></tr></thead><tbody>'+
+    (lista.length ? lista.map(function(t){
+      var extra = [];
+      if (t.habilita) extra.push('Habilita: '+t.habilita);
+      if (t.habilitaA) extra.push('→ Habilita la tarea '+t.habilitaA);
+      if (t.bloqueadaPor.length) extra.push('Espera a: '+t.bloqueadaPor.join(', '));
+      if (t.hojaRuta) extra.push('HR '+t.hojaRuta);
+      if (subResumen(t)) extra.push(subResumen(t)+(t.subVencidas?' ('+t.subVencidas+' vencida'+(t.subVencidas>1?'s':'')+')':''));
+      if (t.solucion) extra.push('Solución: '+t.solucion);
+      return '<tr class="clic" data-id="'+esc(t.id)+'">'+(conUnidad?'<td><b>'+esc(t.unidad)+'</b></td>':'')+
+        '<td style="white-space:nowrap"><b>'+esc(t.id)+'</b></td><td>'+chipT(t.tipo)+(t.area?'<br><span class="marca-sm">'+esc(t.area)+'</span>':'')+'</td>'+
+        '<td class="tarea">'+esc(t.tarea)+(extra.length?'<small>'+esc(extra.join(' · '))+'</small>':'')+'</td>'+
+        '<td class="largo">'+esc(t.mre?t.instancia:'—')+'</td><td style="min-width:150px">'+(t.responsable?esc(respSigla(t))+(persona(t.unidad,t.responsable)?'<br><span class="marca-sm">'+esc(persona(t.unidad,t.responsable))+'</span>':''):'<span class="chip a-SIN-FECHA">Sin asignar</span>')+'</td>'+
+        '<td style="white-space:nowrap">'+fTxt(t.fechaSol)+(t.dias!==''&&!t.concluida?'<br><span class="marca-sm">'+t.dias+' días</span>':'')+'</td>'+
+        '<td style="white-space:nowrap">'+fTxt(t.fechaLim)+(t.faltan!==''&&!t.concluida?'<br><span class="marca-sm">'+(t.faltan<0?'hace '+(-t.faltan)+' días':t.faltan===0?'hoy':'en '+t.faltan+' días')+'</span>':'')+'</td>'+
+        '<td class="estado">'+esc(t.estado||'—')+'</td><td class="prio-'+esc(t.prioridad)+'">'+esc(t.prioridad||'—')+'</td><td>'+chipA(t.alerta)+(t.nivelRiesgo==='Alto'?'<br><span class="chip a-CRITICO" style="margin-top:4px">Riesgo alto</span>':'')+'</td>'+
+        '<td class="largo">'+esc(t.resultado||'—')+(t.fechaFin?'<br><span class="marca-sm">'+fTxt(t.fechaFin)+'</span>':'')+
+          (t.medio||t.adjuntos.length ? '<br><span class="marca-sm">Respaldo: '+esc(t.medio||'')+(t.adjuntos.length?(t.medio?' · ':'')+t.adjuntos.length+' archivo'+(t.adjuntos.length>1?'s':''):'')+'</span>'
+            : (t.sinRespaldo ? '<br><span class="chip a-POR-VENCER">Sin medio de verificación</span>' : ''))+'</td></tr>';
+    }).join('') : '<tr><td colspan="12" class="vacio">'+esc(vacio)+'</td></tr>')+'</tbody></table></div>';
+}
+
+/* ---------- resumen ejecutivo (solo MRE) ---------- */
+function pintarResumen(){
+  var v='RESUMEN', f = filtro(v, {txt:'', unidad:'', tipo:'', inst:'', alerta:'', concl:true});
+  var mre = S.d.tareas.filter(function(t){ return t.mre; });
+  var ab = mre.filter(function(t){ return !t.concluida; });
+  var tiposMre = S.perfil.cat.TIPOS.filter(function(t){ return t!==S.perfil.tipoInterna; });
+  var porU = S.perfil.unidades.map(function(u){
+    var l = mre.filter(function(t){return t.unidad===u.usuario;}), a = l.filter(function(t){return !t.concluida;});
+    return [u.usuario, l.length, a.length, a.filter(function(t){return t.alerta==='VENCIDO';}).length, a.filter(function(t){return t.prioridad==='Alta';}).length,
+            a.filter(function(t){return /sin respuesta/i.test(t.estado);}).length, l.length-a.length];
+  });
+  var inst = {}; ab.forEach(function(t){ var k=t.instancia||'Sin instancia'; inst[k]=(inst[k]||0)+1; });
+  var instL = Object.keys(inst).sort(function(a,b){ return inst[b]-inst[a]; });
+  var porT = tiposMre.map(function(tp){ return [tp, ab.filter(function(t){return t.tipo===tp;}).length]; });
+  var det = aplicar(mre, f).sort(porSeveridad);
+  $('contenido').innerHTML =
+    '<h2>Resumen ejecutivo · Solicitudes, autorizaciones y gestiones con el MRE</h2>'+
+    '<p class="sub">Las tareas internas no se incluyen. Este resumen se publica automáticamente en la hoja «RESUMEN EJECUTIVO MRE», fuente de la Agenda digital.</p>'+
+    kpis([['TOTAL GESTIONES MRE', mre.length], ['PENDIENTES', ab.length], ['VENCIDAS', ab.filter(function(t){return t.alerta==='VENCIDO';}).length, 1],
+          ['SIN RESPUESTA DEL MRE', ab.filter(function(t){return /sin respuesta/i.test(t.estado);}).length, 1],
+          ['ALTA PRIORIDAD PENDIENTE', ab.filter(function(t){return t.prioridad==='Alta';}).length, 1]])+
+    '<div class="seccion"><h3>GESTIONES POR UNIDAD</h3><div class="tabla-env"><table style="min-width:620px"><thead><tr><th>UNIDAD</th><th class="num">TOTAL</th><th class="num">PENDIENTES</th><th class="num">VENCIDAS</th><th class="num">ALTA PEND.</th><th class="num">SIN RESP.</th><th class="num">CONCLUIDAS</th></tr></thead><tbody>'+
+      porU.map(function(r){ return '<tr><td><b>'+esc(r[0])+'</b><br><span class="marca-sm">'+esc(nombreUnidad(r[0]))+'</span></td>'+r.slice(1).map(function(n){return '<td class="num">'+n+'</td>';}).join('')+'</tr>'; }).join('')+
+    '</tbody></table></div></div>'+
+    '<div class="dos seccion">'+
+      '<div><h3>PENDIENTES POR INSTANCIA DEL MRE</h3><div class="tabla-env"><table style="min-width:0"><thead><tr><th>INSTANCIA</th><th class="num">PENDIENTES</th></tr></thead><tbody>'+
+        (instL.length ? instL.map(function(k){ return '<tr><td>'+esc(k)+'</td><td class="num">'+inst[k]+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="vacio">Sin pendientes.</td></tr>')+'</tbody></table></div></div>'+
+      '<div><h3>PENDIENTES POR TIPO</h3><div class="tabla-env"><table style="min-width:0"><thead><tr><th>TIPO</th><th class="num">PENDIENTES</th></tr></thead><tbody>'+
+        porT.map(function(r){ return '<tr><td>'+chipT(r[0])+' '+esc(r[0])+'</td><td class="num">'+r[1]+'</td></tr>'; }).join('')+'</tbody></table></div></div>'+
+    '</div>'+
+    '<div class="seccion"><h3>DETALLE CONSOLIDADO</h3>'+
+      '<div class="barra"><label class="crece">BUSCAR <input type="text" data-f="txt" value="'+esc(f.txt)+'"></label>'+selUnidad(f)+selTipo(f, tiposMre)+
+      '<label>INSTANCIA <select data-f="inst">'+opts(S.perfil.cat.INSTANCIAS, f.inst, 'Todas')+'</select></label>'+selArea(f)+selAlerta(f)+
+      '<label class="check"><input type="checkbox" data-f="concl"'+(f.concl?' checked':'')+'> Ver concluidas</label></div>'+
+      '<div class="barra" style="justify-content:space-between"><span class="marca-sm">'+det.length+' gestiones en pantalla. La descarga incluye lo que muestra el filtro.</span>'+barraDescargas()+'</div>'+
+      tablaTareas(det, true, 'Sin gestiones con el MRE para mostrar.')+'</div>';
+  enlazarFiltros(v, pintarResumen);
+  enlazarDescargas(function(){
+    return { titulo: 'Resumen ejecutivo · Gestiones con el MRE', sub: (f.unidad ? nombreUnidad(f.unidad) : 'Todas las unidades')+' · '+filtroTxt(f), archivo: 'Resumen_Ejecutivo_MRE'+(f.unidad?'_'+f.unidad:''),
+      lista: det, conUnidad: true,
+      kpis: [['Total gestiones MRE', mre.length], ['Pendientes', ab.length], ['Vencidas', ab.filter(function(t){return t.alerta==='VENCIDO';}).length],
+             ['Sin respuesta del MRE', ab.filter(function(t){return /sin respuesta/i.test(t.estado);}).length], ['Alta prioridad pendiente', ab.filter(function(t){return t.prioridad==='Alta';}).length]] };
+  });
+}
+
+/* ---------- alertas ---------- */
+function pintarAlertas(){
+  var v='ALERTAS', f = filtro(v, {unidad:'', resp:''});
+  var base = S.d.tareas.filter(function(t){ return !t.concluida && (!f.unidad||t.unidad===f.unidad) && (!f.resp||t.responsable===f.resp); });
+  var dpv = S.perfil.diasPorVencer, dsa = S.perfil.diasSinActualizar;
+  var grupos = [
+    ['r','Vencidas','La fecha límite ya pasó', base.filter(function(t){return t.alerta==='VENCIDO';}), function(t){ return 'Venció el '+fTxt(t.fechaLim)+' (hace '+(-t.faltan)+' días)'; }],
+    ['a','Por vencer','Faltan '+dpv+' días o menos', base.filter(function(t){return t.alerta==='POR VENCER';}), function(t){ return 'Vence '+(t.faltan===0?'hoy':'en '+t.faltan+' días')+' · '+fTxt(t.fechaLim); }],
+    ['r','Críticas','Prioridad alta con más de 15 días desde la solicitud', base.filter(function(t){return t.prioridad==='Alta'&&t.dias!==''&&t.dias>15;}), function(t){ return t.dias+' días desde la solicitud · '+(t.estado||'sin estado'); }],
+    ['g','Sin actualizar','Nadie las actualizó en más de '+dsa+' días (posible olvido)', base.filter(function(t){return t.sinActualizar;}), function(t){ return 'Última actualización hace '+t.diasSinActualizar+' días · '+t.actualizadoTxt; }],
+    ['r','Subtareas vencidas','Pasos con fecha pasada que no se marcaron como hechos', base.filter(function(t){return t.subVencidas;}), function(t){ var v = t.subPend.filter(function(x){ return x.fecha && x.fecha < S.d.hoy; }); return v.length+' vencida'+(v.length>1?'s':'')+': '+v.map(function(x){ return fTxt(x.fecha)+' '+x.texto; }).join(' · '); }],
+    ['c','Bloquean otra tarea','Gestiones pendientes de las que depende otra tarea', base.filter(function(t){return t.bloquea;}), function(t){ return 'Habilita la tarea '+t.habilitaA; }],
+    ['g','Sin responsable','Asigne un responsable de la gestión', base.filter(function(t){return t.sinResponsable;}), function(t){ return tipoCorto(t.tipo); }],
+    ['g','Sin fecha límite','Defina un plazo para que entren al cronograma', base.filter(function(t){return !t.fechaLim;}), function(t){ return tipoCorto(t.tipo)+(t.dias!==''?' · '+t.dias+' días desde inicio':''); }],
+    ['r','Críticas o de riesgo alto sin línea de solución','Defina la acción para destrabarlas', base.filter(function(t){return t.sinSolucion;}), function(t){ return (t.nivelRiesgo==='Alto'?'Riesgo alto · ':'')+t.alerta; }],
+    ['a','Concluidas sin medio de verificación','Registre el respaldo: nota, HR, acta o archivo', S.d.tareas.filter(function(t){ return t.sinRespaldo && (!f.unidad||t.unidad===f.unidad) && (!f.resp||t.responsable===f.resp); }), function(t){ return 'Concluida el '+fTxt(t.fechaFin)+' · '+tipoCorto(t.tipo); }]
+  ];
+  $('contenido').innerHTML = '<h2>Alertas</h2><p class="sub">Tareas abiertas que requieren atención. Pulse una tarea para actualizarla.</p>'+
+    '<div class="barra">'+selUnidad(f)+selResp(f, S.d.tareas)+'</div>'+
+    '<div class="al-grid">'+grupos.map(function(g){
+      var l = g[3].sort(porSeveridad);
+      return '<div class="al-caja"><div class="al-cab '+g[0]+'"><div>'+esc(g[1])+'<small>'+esc(g[2])+'</small></div><b>'+l.length+'</b></div>'+
+        (l.length ? l.map(function(t){
+          return '<div class="al-item" data-id="'+esc(t.id)+'"><div class="l1"><b>'+esc(t.id)+'</b> · '+esc(t.tarea)+'</div>'+
+            '<div class="l2">'+esc(g[4](t))+' · '+(t.responsable?esc(respTxt(t)):'sin responsable')+'</div></div>';
+        }).join('') : '<div class="al-vacio">Nada pendiente.</div>')+'</div>';
+    }).join('')+'</div>';
+  enlazarFiltros(v, pintarAlertas);
+}
+
+/* ---------- cronograma ---------- */
+function dia(iso){ var p=iso.split('-'); return Date.UTC(+p[0],+p[1]-1,+p[2])/86400000; }
+function pintarCrono(){
+  var v='CRONO', f = filtro(v, {unidad:'', tipo:'', resp:'', concl:false});
+  var hoy = dia(S.d.hoy);
+  var lista = aplicar(S.d.tareas, f);
+  var con = [], sin = [];
+  lista.forEach(function(t){
+    var fs = (t.subtareas||[]).filter(function(x){ return x.fecha; }).map(function(x){ return dia(x.fecha); });
+    if (!t.fechaSol && !t.fechaLim && !fs.length) { sin.push(t); return; }
+    if (!t.fechaSol && !t.fechaLim) { con.push({t:t, ini:Math.min.apply(null, fs), fin:Math.max.apply(null, fs), abierta:!t.concluida, porPasos:true}); return; }
+    var ini = t.fechaSol ? dia(t.fechaSol) : dia(t.fechaLim);
+    var fin = t.concluida ? (t.fechaFin ? dia(t.fechaFin) : t.fechaLim ? dia(t.fechaLim) : ini)
+            : t.fechaLim ? Math.max(dia(t.fechaLim), t.alerta==='VENCIDO' ? hoy : 0) : hoy;
+    con.push({t:t, ini:ini, fin:Math.max(fin, ini), abierta:!t.fechaLim && !t.concluida});
+  });
+  var min = hoy-14, max = hoy+30;
+  con.forEach(function(x){ min=Math.min(min,x.ini); max=Math.max(max,x.fin, x.t.fechaLim?dia(x.t.fechaLim):0);
+    (x.t.subtareas||[]).forEach(function(s){ if (s.fecha){ min=Math.min(min,dia(s.fecha)); max=Math.max(max,dia(s.fecha)); } }); });
+  if (max-min > 270) min = max-270;
+  min -= 2; max += 3;
+  var span = max-min, pct = function(d){ return Math.max(0, Math.min(100, (d-min)/span*100)); };
+  var meses = [], dd = new Date(min*86400000); dd = new Date(Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth()+1, 1));
+  var nomM = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  while (dd.getTime()/86400000 < max){ meses.push({d:dd.getTime()/86400000, t:nomM[dd.getUTCMonth()]+' '+String(dd.getUTCFullYear()).slice(2)}); dd = new Date(Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth()+1, 1)); }
+  var lineas = meses.map(function(m){ return '<div class="g-linea" style="left:'+pct(m.d)+'%"></div>'; }).join('');
+  var grupos = S.perfil.esPlan && !f.unidad ? S.perfil.unidades.map(function(u){ return u.usuario; }) : [null];
+  con.sort(function(a,b){ return a.ini-b.ini; });
+  var filas = '';
+  grupos.forEach(function(g){
+    var l = con.filter(function(x){ return !g || x.t.unidad===g; });
+    if (g) filas += '<div class="g-fila grupo"><div class="g-et">'+esc(g)+' · '+l.length+'</div><div class="g-pista">'+lineas+'</div></div>';
+    l.forEach(function(x){
+      var t = x.t, izq = pct(x.ini), anc = Math.max(pct(x.fin)-izq, 0.5);
+      var tit = t.id+' · '+t.tarea+'\nInicio: '+fTxt(t.fechaSol)+' · Límite: '+fTxt(t.fechaLim)+'\n'+(t.estado||'')+' · '+t.alerta;
+      filas += '<div class="g-fila"><div class="g-et"><b title="'+esc(t.tarea)+'">'+esc(t.id)+' · '+esc(t.tarea)+'</b><small>'+esc(tipoCorto(t.tipo))+' · '+esc(respTxt(t)||'sin responsable')+'</small></div>'+
+        '<div class="g-pista">'+lineas+
+          '<div class="g-barra '+claseC(t.alerta)+(x.abierta?' abierta':'')+'" data-id="'+esc(t.id)+'" title="'+esc(tit)+'" style="left:'+izq+'%;width:'+anc+'%">'+esc(anc>9?(x.porPasos?'SEGÚN SUBTAREAS':t.alerta):'')+'</div>'+
+          (t.fechaLim && !t.concluida ? '<div class="g-hito" data-id="'+esc(t.id)+'" title="Fecha límite '+fTxt(t.fechaLim)+'" style="left:'+pct(dia(t.fechaLim))+'%"></div>' : '')+
+          (t.subtareas||[]).filter(function(s){ return s.fecha; }).map(function(s){
+            var c = s.hecho ? 'ok' : (dia(s.fecha) < hoy ? 'venc' : '');
+            return '<div class="g-sub '+c+'" data-id="'+esc(t.id)+'" title="'+esc(fTxt(s.fecha)+' · '+s.texto+(s.hecho?' (hecho)':''))+'" style="left:'+pct(dia(s.fecha))+'%"></div>'; }).join('')+
+        '</div></div>';
+    });
+  });
+  $('contenido').innerHTML = '<h2>Cronograma</h2><p class="sub">Cada barra va desde la fecha de solicitud o inicio hasta la fecha límite; el rombo marca el plazo y los puntos, las subtareas. Las tareas sin fechas pero con subtareas fechadas se dibujan desde su primer hasta su último paso. Pulse una barra para actualizar la tarea.</p>'+
+    '<div class="barra">'+selUnidad(f)+selTipo(f)+selResp(f, S.d.tareas)+'<label class="check"><input type="checkbox" data-f="concl"'+(f.concl?' checked':'')+'> Ver concluidas</label></div>'+
+    (con.length ? '<div class="gantt"><div class="g-in">'+
+      '<div class="g-fila g-cab"><div class="g-et">TAREA</div><div class="g-pista">'+meses.map(function(m){ return '<div class="g-mes" style="left:'+pct(m.d)+'%">'+m.t+'</div>'; }).join('')+'</div></div>'+
+      filas+
+      '<div class="g-hoy" style="left:calc(280px + (100% - 280px) * '+(pct(hoy)/100)+')"><span>HOY</span></div>'+
+    '</div></div>' : '<div class="msg info">No hay tareas con fechas para mostrar con estos filtros.</div>')+
+    '<div class="g-ley">'+['VENCIDO','CRÍTICO','POR VENCER','SEGUIMIENTO','EN CURSO','CONCLUIDO'].map(function(a){ return '<span><i class="'+claseC(a)+'"></i>'+a+'</span>'; }).join('')+
+      '<span><i style="background:#fff;border:2px solid #1B2333;transform:rotate(45deg);width:9px;height:9px"></i>Fecha límite</span><span>Barra que se desvanece: sin fecha límite</span><span><i style="background:#fff;border:2px solid #1B2333;border-radius:50%;width:9px;height:9px"></i>Subtarea (verde: hecha · amarillo: vencida)</span></div>'+
+    (sin.length ? '<div class="seccion"><h3>SIN FECHAS ('+sin.length+')</h3><p class="sub">Registre la fecha de solicitud o la fecha límite para verlas en el cronograma.</p>'+tablaTareas(sin.sort(porSeveridad), S.perfil.esPlan, '')+'</div>' : '');
+  if (window.innerWidth <= 760) Array.prototype.forEach.call(document.querySelectorAll('.g-hoy'), function(h){ h.style.left='calc(170px + (100% - 170px) * '+(pct(hoy)/100)+')'; });
+  enlazarFiltros(v, pintarCrono);
+}
+
+/* ---------- responsables ---------- */
+function pintarResp(){
+  var unidades = S.perfil.unidades, plan = S.perfil.esPlan;
+  $('contenido').innerHTML = '<h2>Responsables de la gestión</h2><p class="sub">Las tareas se asignan a un <b>cargo</b>. Registre el nombre de la persona designada en cada cargo; si cambia de persona, las tareas se mantienen en el cargo. Solo los cargos activos aparecen al asignar una tarea. Si un cargo está acéfalo, escriba el nombre de la persona que lo cubrirá en el cargo <b>Apoyo</b> de la unidad y asígnele la tarea de forma provisional.</p>'+
+    '<div class="barra">'+(plan?'<label>UNIDAD <select id="rpU">'+opts(unidades.map(function(u){return u.usuario;}), '', false)+'</select></label>':'')+
+      '<label class="crece">CARGO <input type="text" id="rpC" placeholder="Ej.: Profesional en Turismo"></label><label class="crece">PERSONA DESIGNADA (opcional) <input type="text" id="rpN"></label>'+
+      '<button class="btn" id="rpAdd">Agregar cargo</button></div><div id="rpMsg" class="msg error oculto" style="margin-bottom:12px"></div>'+
+    unidades.map(function(u){
+      var l = S.d.responsables.filter(function(r){ return r.unidad===u.usuario; });
+      var otras = unidades.filter(function(x){ return x.usuario!==u.usuario; }).map(function(x){ return x.usuario; });
+      return '<div class="seccion"><h3>'+esc(u.nombre)+' · '+l.filter(function(r){return r.activo;}).length+' cargos activos</h3><div class="tabla-env"><table style="min-width:'+(plan?860:700)+'px"><thead><tr><th>CARGO</th><th>PERSONA DESIGNADA</th><th class="num">TAREAS ABIERTAS</th><th>ESTADO</th><th></th>'+(plan?'<th>MOVER A</th>':'')+'</tr></thead><tbody>'+
+        (l.length ? l.map(function(r){
+          var k = esc(u.usuario+'|'+r.cargo);
+          var n = S.d.tareas.filter(function(t){ return !t.concluida && ((t.unidad===u.usuario && t.responsable===r.cargo) || t.responsable===u.usuario+' · '+r.cargo); }).length;
+          return '<tr'+(r.activo?'':' style="opacity:.6"')+'><td><b>'+esc(r.cargo)+'</b></td>'+
+            '<td style="min-width:240px"><div style="display:flex;gap:6px"><input type="text" data-rn="'+k+'" value="'+esc(r.nombre)+'" placeholder="Nombre y apellido"><button class="btn sec peq" data-ru="'+esc(u.usuario)+'" data-rc="'+esc(r.cargo)+'" data-acc="nombre">Guardar</button></div></td>'+
+            '<td class="num">'+n+'</td><td>'+(r.activo?'<span class="chip a-CONCLUIDO">Activo</span>':'<span class="chip a-SIN-FECHA">Inactivo</span>')+'</td>'+
+            '<td><button class="btn sec peq" data-ru="'+esc(u.usuario)+'" data-rc="'+esc(r.cargo)+'" data-acc="'+(r.activo?'off':'on')+'">'+(r.activo?'Desactivar':'Activar')+'</button></td>'+
+            (plan?'<td><div style="display:flex;gap:6px"><select data-rm="'+k+'" style="min-width:110px">'+opts(otras,'','—')+'</select><button class="btn sec peq" data-ru="'+esc(u.usuario)+'" data-rc="'+esc(r.cargo)+'" data-acc="mover">Mover</button></div></td>':'')+'</tr>';
+        }).join('') : '<tr><td colspan="6" class="vacio">Aún no hay cargos registrados.</td></tr>')+'</tbody></table></div></div>';
+    }).join('');
+  $('rpAdd').addEventListener('click', function(){
+    var u = plan ? $('rpU').value : unidades[0].usuario;
+    srv('guardarResponsable', S.token, u, $('rpC').value, $('rpN').value).then(function(d){ S.d=d; pintarResp(); aviso('Cargo registrado'); })
+      .catch(function(e){ mostrarError($('rpMsg'), e.message); });
+  });
+}
+
+/* ---------- diálogo de tarea ---------- */
+var editando = null;
+function abrirTarea(t, unidad){
+  editando = t || null;
+  var fm = $('fTarea'), cat = S.perfil.cat;
+  unidad = t ? t.unidad : (unidad || S.perfil.unidades[0].usuario);
+  $('dtTitulo').textContent = t ? 'Tarea '+t.id+' · '+t.unidad : 'Nueva tarea';
+  fm.elements.unidad.innerHTML = opts(S.perfil.unidades.map(function(u){return {v:u.usuario,t:u.nombre};}), unidad, false);
+  fm.elements.unidad.disabled = !!t && !S.perfil.esPlan;
+  fm.elements.unidad.dataset.prev = unidad;
+  $('dtUnidadL').classList.toggle('oculto', !S.perfil.esPlan);
+  fm.elements.tipo.innerHTML = opts(cat.TIPOS, t?t.tipo:'', 'Seleccione…');
+  fm.elements.instancia.innerHTML = opts(cat.INSTANCIAS, t?t.instancia:'');
+  fm.elements.area.innerHTML = opts(cat.AREAS || [], t?t.area:'', 'Seleccione…');
+  fm.elements.estado.innerHTML = opts(cat.ESTADOS, t?t.estado:'Pendiente');
+  fm.elements.prioridad.innerHTML = opts(cat.PRIORIDADES, t?t.prioridad:'Media');
+  fm.elements.nivelRiesgo.innerHTML = opts(S.perfil.nivelesRiesgo || ['Alto','Medio','Bajo'], t?t.nivelRiesgo:'');
+  ['tarea','gestion','habilita','riesgo','hojaRuta','fechaSol','fechaLim','resultado','medio','fechaFin','obs','solucion','plazoSolucion'].forEach(function(k){ fm.elements[k].value = t ? (t[k]||'') : ''; });
+  if (!t) fm.elements.fechaSol.value = S.d.hoy;
+  llenarDependientes(unidad);
+  $('dtAct').textContent = t && t.actualizadoTxt ? 'Última actualización: '+t.actualizadoTxt+' por '+t.actualizadoPor : '';
+  $('dtBorrar').classList.toggle('oculto', !t);
+  subEdit = t && t.subtareas ? t.subtareas.map(function(x){ return {texto:x.texto, fecha:x.fecha, hecho:x.hecho}; }) : [];
+  pintarSub();
+  pintarAdjuntos();
+  mostrarError($('dtMsg'), '');
+  ajustarTipo();
+  $('dTarea').showModal();
+}
+// Lista con grupos por unidad: la unidad de la tarea primero y, para DGE y Planificación, todas las demás.
+function optsGrupos(grupos, valor, vacio){
+  var hay = false, html = '<option value="">'+esc(vacio)+'</option>';
+  grupos.forEach(function(g){
+    if (!g.items.length) return;
+    html += '<optgroup label="'+esc(g.nombre)+'">'+g.items.map(function(o){
+      if (o.v===valor) hay = true;
+      return '<option value="'+esc(o.v)+'"'+(o.v===valor?' selected':'')+'>'+esc(o.t)+'</option>'; }).join('')+'</optgroup>';
+  });
+  if (valor && !hay) html += '<option value="'+esc(valor)+'" selected>'+esc(valor)+'</option>';
+  return html;
+}
+function ordenUnidades(unidad){
+  var l = S.perfil.esPlan ? S.perfil.unidades.map(function(u){ return u.usuario; }) : [unidad];
+  return [unidad].concat(l.filter(function(u){ return u!==unidad; }));
+}
+function llenarDependientes(unidad){
+  var fm = $('fTarea'), t = editando, gr;
+  gr = ordenUnidades(unidad).map(function(u){
+    return { nombre: nombreUnidad(u), items: S.d.responsables.filter(function(r){ return r.unidad===u && r.activo; })
+      .map(function(r){ return { v: u===unidad ? r.cargo : u+' · '+r.cargo, t: u+' - '+r.cargo+(r.nombre?' — '+r.nombre:(r.cargo==='Apoyo'?' (asignación provisional)':'')) }; }) };
+  });
+  var nResp = gr.reduce(function(s,g){ return s+g.items.length; }, 0);
+  fm.elements.responsable.innerHTML = optsGrupos(gr, t?t.responsable:'', nResp?'Seleccione…':'Registre responsables en la pestaña Responsables');
+  gr = ordenUnidades(unidad).map(function(u){
+    return { nombre: nombreUnidad(u), items: S.d.tareas.filter(function(x){ return x.unidad===u && (!t || x.id!==t.id) && !x.concluida; })
+      .map(function(x){ return { v:x.id, t:x.id+' · '+x.tarea.slice(0,70) }; }) };
+  });
+  var nTar = gr.reduce(function(s,g){ return s+g.items.length; }, 0);
+  fm.elements.habilitaA.innerHTML = optsGrupos(gr, t?t.habilitaA:'', nTar?'Ninguna':'Ninguna (no hay otras tareas abiertas)');
+}
+function ajustarTipo(){
+  var interna = $('fTarea').elements.tipo.value === S.perfil.tipoInterna;
+  $('dtInstL').classList.toggle('oculto', interna);
+}
+$('fTarea').elements.tipo.addEventListener('change', ajustarTipo);
+// Reasignar a otra unidad: se conserva el responsable y la tarea habilitada elegidos
+$('fTarea').elements.unidad.addEventListener('change', function(e){
+  var fm = $('fTarea'), ant = e.target.dataset.prev, nueva = e.target.value, r = fm.elements.responsable.value, h = fm.elements.habilitaA.value;
+  var abs = !r ? '' : (/ · /.test(r) ? r : ant+' · '+r);
+  llenarDependientes(nueva);
+  var rel = abs.indexOf(nueva+' · ')===0 ? abs.slice(nueva.length+3) : abs;
+  if (rel && ![].some.call(fm.elements.responsable.options, function(o){ return o.value===rel; })) fm.elements.responsable.insertAdjacentHTML('beforeend', '<option value="'+esc(rel)+'">'+esc(rel)+'</option>');
+  fm.elements.responsable.value = rel; fm.elements.habilitaA.value = h;
+  e.target.dataset.prev = nueva;
+  if (editando && nueva !== editando.unidad) mostrarError($('dtMsg'), 'Al guardar, la tarea pasará a '+nombreUnidad(nueva)+' con un código nuevo de esa unidad.');
+  else mostrarError($('dtMsg'), '');
+});
+$('fTarea').elements.estado.addEventListener('change', function(e){ var ff=$('fTarea').elements.fechaFin; if (e.target.value==='Concluido' && !ff.value) ff.value = S.d.hoy; });
+$('dtCancelar').addEventListener('click', function(){ $('dTarea').close(); });
+$('fTarea').addEventListener('submit', function(ev){
+  ev.preventDefault();
+  var fm = ev.target, d = { id: editando ? editando.id : '', unidad: fm.elements.unidad.value };
+  ['tipo','tarea','instancia','gestion','habilita','habilitaA','riesgo','responsable','hojaRuta','fechaSol','fechaLim','estado','prioridad','resultado','medio','fechaFin','obs','nivelRiesgo','solucion','plazoSolucion','area'].forEach(function(k){ d[k]=fm.elements[k].value; });
+  d.subtareas = subEdit.filter(function(x){ return String(x.texto||'').trim(); });
+  if (d.tipo === S.perfil.tipoInterna) d.instancia = '';
+  if (d.fechaSol && d.fechaLim && d.fechaLim < d.fechaSol){ mostrarError($('dtMsg'), 'La fecha límite no puede ser anterior a la fecha de inicio.'); return; }
+  $('dtGuardar').disabled = true;
+  var reasigna = editando && d.unidad !== editando.unidad;
+  srv('guardarTarea', S.token, d).then(function(r){ S.d = r; $('dTarea').close(); ir(S.vista); aviso(reasigna ? 'Tarea reasignada a '+d.unidad : 'Tarea guardada'); })
+    .catch(function(e){ mostrarError($('dtMsg'), e.message); }).finally(function(){ $('dtGuardar').disabled = false; });
+});
+$('dtBorrar').addEventListener('click', function(){
+  var b = $('dtBorrar'); if (!editando) return;
+  if (!b.dataset.c){ b.dataset.c='1'; b.textContent='¿Confirmar eliminación?'; setTimeout(function(){ delete b.dataset.c; b.textContent='Eliminar'; },4000); return; }
+  delete b.dataset.c; b.textContent='Eliminar';
+  srv('borrarTarea', S.token, editando.id).then(function(r){ S.d=r; $('dTarea').close(); ir(S.vista); aviso('Tarea eliminada'); })
+    .catch(function(e){ mostrarError($('dtMsg'), e.message); });
+});
+
+/* ---------- medios de verificación: archivos ---------- */
+var MAX_MB = 10;
+/* ---------- subtareas ---------- */
+var subEdit = [];
+function pintarSub(){
+  $('dtSub').innerHTML = subEdit.map(function(x, i){
+    var venc = !x.hecho && x.fecha && x.fecha < S.d.hoy;
+    return '<div class="sub-item'+(x.hecho?' hecho':'')+(venc?' vencida':'')+'"><input type="checkbox" data-sub-h="'+i+'"'+(x.hecho?' checked':'')+' aria-label="Hecho">'+
+      '<input type="date" data-sub-f="'+i+'" value="'+esc(x.fecha)+'" aria-label="Fecha">'+
+      '<input type="text" data-sub-t="'+i+'" value="'+esc(x.texto)+'" placeholder="Ej.: Obtener visto bueno de Despacho">'+
+      '<button type="button" class="btn sec peq" data-sub-x="'+i+'" aria-label="Quitar paso">Quitar</button></div>';
+  }).join('') + '<div><button type="button" class="btn sec peq" id="subAdd">+ Agregar subtarea</button></div>';
+}
+$('dtSub').addEventListener('input', function(e){
+  var el = e.target;
+  if (el.dataset.subT !== undefined) subEdit[+el.dataset.subT].texto = el.value;
+  if (el.dataset.subF !== undefined) subEdit[+el.dataset.subF].fecha = el.value;
+});
+$('dtSub').addEventListener('change', function(e){
+  var el = e.target;
+  if (el.dataset.subH !== undefined){ subEdit[+el.dataset.subH].hecho = el.checked; pintarSub(); }
+  if (el.dataset.subF !== undefined){ subEdit[+el.dataset.subF].fecha = el.value; pintarSub(); }
+});
+$('dtSub').addEventListener('click', function(e){
+  var el = e.target;
+  if (el.id === 'subAdd'){ subEdit.push({texto:'', fecha:'', hecho:false}); pintarSub(); var l = $('dtSub').querySelectorAll('input[type=text]'); l[l.length-1].focus(); }
+  if (el.dataset.subX !== undefined){ subEdit.splice(+el.dataset.subX, 1); pintarSub(); }
+});
+function subResumen(t){
+  if (!t.subtareas || !t.subtareas.length) return '';
+  var hechas = t.subtareas.length - t.subPend.length, prox = t.subPend.filter(function(x){ return x.fecha; }).sort(function(a,b){ return a.fecha<b.fecha?-1:1; })[0] || t.subPend[0];
+  return 'Subtareas '+hechas+'/'+t.subtareas.length+(prox ? ' · próxima'+(prox.fecha?' '+fTxt(prox.fecha):'')+': '+prox.texto : '');
+}
+
+function pintarAdjuntos(){
+  var t = editando, box = $('dtAdj');
+  if (!t){ box.innerHTML = '<p class="marca-sm" style="margin:0">Guarde la tarea para poder adjuntar archivos de respaldo (PDF, fotos, Word…).</p>'; return; }
+  box.innerHTML = (t.adjuntos.length ? t.adjuntos.map(function(a){
+      return '<div class="adj-item"><span title="'+esc(a.nombre)+'">'+esc(a.nombre)+'</span>'+
+        '<button type="button" class="btn sec peq" data-adj-ver="'+esc(a.id)+'">Descargar</button>'+
+        '<button type="button" class="btn peligro peq" data-adj-quitar="'+esc(a.id)+'">Quitar</button></div>';
+    }).join('') : '<p class="marca-sm" style="margin:0">Aún no hay archivos de respaldo.</p>')+
+    '<div class="adj-subir"><input type="file" id="adjArchivo" aria-label="Archivo de respaldo"><span>Máximo '+MAX_MB+' MB por archivo. Se guarda en el Drive de BOLMUN, visible solo para la unidad y Planificación.</span></div>';
+}
+function bajarBase64(nombre, mime, b64){
+  var bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  var url = URL.createObjectURL(new Blob([arr], {type: mime || 'application/octet-stream'}));
+  var a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 4000);
+}
+$('dTarea').addEventListener('change', function(ev){
+  if (ev.target.id !== 'adjArchivo' || !ev.target.files.length || !editando) return;
+  var f = ev.target.files[0];
+  if (f.size > MAX_MB*1024*1024){ mostrarError($('dtMsg'), 'El archivo pesa '+(f.size/1048576).toFixed(1)+' MB; el máximo es '+MAX_MB+' MB.'); ev.target.value=''; return; }
+  var lector = new FileReader();
+  lector.onload = function(){
+    var b64 = String(lector.result).split(',')[1] || '';
+    cargando(true);
+    srv('subirMedio', S.token, editando.id, f.name, f.type, b64).then(function(d){
+      S.d = d; editando = d.tareas.filter(function(x){ return x.id===editando.id; })[0]; pintarAdjuntos(); ir(S.vista); aviso('Archivo adjuntado');
+    }).catch(function(e){ mostrarError($('dtMsg'), e.message); }).finally(function(){ cargando(false); });
+  };
+  lector.readAsDataURL(f);
+});
+$('dTarea').addEventListener('click', function(ev){
+  var v = ev.target.closest('[data-adj-ver]'), q = ev.target.closest('[data-adj-quitar]');
+  if (v){
+    cargando(true);
+    srv('descargarMedio', S.token, editando.id, v.dataset.adjVer).then(function(r){ bajarBase64(r.nombre, r.mime, r.b64); })
+      .catch(function(e){ mostrarError($('dtMsg'), e.message); }).finally(function(){ cargando(false); });
+  }
+  if (q){
+    if (!q.dataset.c){ q.dataset.c='1'; q.textContent='¿Quitar?'; setTimeout(function(){ delete q.dataset.c; q.textContent='Quitar'; },4000); return; }
+    cargando(true);
+    srv('quitarMedio', S.token, editando.id, q.dataset.adjQuitar).then(function(d){
+      S.d = d; editando = d.tareas.filter(function(x){ return x.id===editando.id; })[0]; pintarAdjuntos(); ir(S.vista); aviso('Archivo quitado');
+    }).catch(function(e){ mostrarError($('dtMsg'), e.message); }).finally(function(){ cargando(false); });
+  }
+});
+
+/* ---------- descargar resumen: Excel y PDF ---------- */
+var COLS_EXP = [['id','ID'],['unidad','UNIDAD'],['tipo','TIPO'],['area','ÁREA FUNCIONAL'],['tarea','TAREA / ASUNTO'],['instancia','INSTANCIA DEL MRE'],['gestion','GESTIÓN REQUERIDA'],
+  ['habilita','¿QUÉ HABILITA?'],['responsable','RESPONSABLE (CARGO)'],['_persona','PERSONA DESIGNADA'],['hojaRuta','HOJA DE RUTA'],['fechaSol','FECHA SOLICITUD'],
+  ['fechaLim','FECHA LÍMITE'],['dias','DÍAS'],['estado','ESTADO'],['prioridad','PRIORIDAD'],['alerta','ALERTA'],['resultado','RESULTADO OBTENIDO'],
+  ['fechaFin','FECHA CONCLUSIÓN'],['medio','MEDIO DE VERIFICACIÓN'],['_archivos','ARCHIVOS DE RESPALDO'],['nivelRiesgo','NIVEL DE RIESGO'],['solucion','LÍNEA DE SOLUCIÓN'],['plazoSolucion','PLAZO DE LA SOLUCIÓN'],['_subtareas','SUBTAREAS / PASOS'],['obs','OBSERVACIONES']];
+function valorExp(t, k){
+  if (k==='_persona') return persona(t.unidad, t.responsable);
+  if (k==='responsable') return respSigla(t);
+  if (k==='_subtareas') return (t.subtareas||[]).map(function(x){ return (x.hecho?'[hecho] ':'[ ] ')+(x.fecha?fTxt(x.fecha)+' ':'')+x.texto; }).join('\n');
+  if (k==='_archivos') return t.adjuntos.map(function(a){ return a.nombre; }).join('; ');
+  if (k==='fechaSol'||k==='fechaLim'||k==='fechaFin'||k==='plazoSolucion') return t[k] ? fTxt(t[k]) : '';
+  return t[k]==null ? '' : t[k];
+}
+function sello(){ var d=new Date(); return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+function barraDescargas(){ return '<div class="descargas"><button class="btn sec" type="button" id="bExcel">Descargar Excel</button><button class="btn sec" type="button" id="bPdf">Imprimir / PDF</button></div>'; }
+function enlazarDescargas(rep){
+  $('bExcel').addEventListener('click', function(){ descargarExcel(rep()); });
+  $('bPdf').addEventListener('click', function(){ imprimir(rep()); });
+}
+function descargarExcel(r){
+  var cab = [['BOLIVIA EN EL MUNDO'],[r.titulo],[r.sub],['Generado el '+sello()+' por '+S.perfil.usuario],[]]
+    .concat(r.kpis.map(function(k){ return [k[0], k[1]]; })).concat([[]]);
+  var filas = cab.concat([COLS_EXP.map(function(c){ return c[1]; })])
+    .concat(r.lista.map(function(t){ return COLS_EXP.map(function(c){ return valorExp(t, c[0]); }); }));
+  var nombre = r.archivo + '_' + S.d.hoy;
+  try {
+    if (!window.XLSX) throw new Error('sin librería');
+    var ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = COLS_EXP.map(function(c){ return {wch: /TAREA|GESTIÓN|HABILITA|RESULTADO|MEDIO|OBSERV|ARCHIVOS/.test(c[1]) ? 40 : 16}; });
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+    XLSX.writeFile(wb, nombre + '.xlsx');
+  } catch(e){
+    var csv = filas.map(function(f){ return f.map(function(v){ v=String(v==null?'':v); return /[;"\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }).join(';'); }).join('\r\n');
+    var url = URL.createObjectURL(new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'}));
+    var a = document.createElement('a'); a.href=url; a.download=nombre+'.csv'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 4000);
+  }
+  aviso('Resumen descargado');
+}
+function imprimir(r){
+  var cols = [['id','ID'],['tipo','TIPO'],['tarea','TAREA / ASUNTO'],['instancia','INSTANCIA MRE'],['responsable','RESPONSABLE'],['fechaSol','INICIO'],['fechaLim','LÍMITE'],
+    ['estado','ESTADO'],['alerta','ALERTA'],['resultado','RESULTADO'],['medio','MEDIO DE VERIFICACIÓN'],['_archivos','ARCHIVOS']];
+  if (r.conUnidad) cols.splice(1, 0, ['unidad','UNIDAD']);
+  $('reporte').innerHTML = '<h1>BOLIVIA EN EL MUNDO · '+esc(r.titulo)+'</h1><p class="r-sub">'+esc(r.sub)+' · Generado el '+sello()+' por '+esc(S.perfil.usuario)+'</p>'+
+    '<div class="r-kpi">'+r.kpis.map(function(k){ return '<span>'+esc(k[0])+': <b>'+k[1]+'</b></span>'; }).join('')+'</div>'+
+    '<table><thead><tr>'+cols.map(function(c){ return '<th>'+c[1]+'</th>'; }).join('')+'</tr></thead><tbody>'+
+    (r.lista.length ? r.lista.map(function(t){ return '<tr>'+cols.map(function(c){
+      var v = c[0]==='responsable' ? respTxt(t) : valorExp(t, c[0]); return '<td>'+esc(v||'—')+'</td>'; }).join('')+'</tr>'; }).join('')
+      : '<tr><td colspan="'+cols.length+'">Sin registros.</td></tr>')+'</tbody></table>'+
+    '<p class="r-pie">Seguimiento de tareas y trámites con el MRE · '+r.lista.length+' registros</p>';
+  setTimeout(function(){ window.print(); }, 50);
+}
+
+/* ---------- informe de tareas críticas ---------- */
+function pintarInforme(){
+  var v='INFORME', f = filtro(v, {unidad:''});
+  var lista = S.d.tareas.filter(function(t){ return t.critica && (!f.unidad||t.unidad===f.unidad); }).sort(porSeveridad);
+  var sinSol = lista.filter(function(t){ return !t.solucion; });
+  var grupos = S.perfil.unidades.filter(function(u){ return !f.unidad || u.usuario===f.unidad; })
+    .map(function(u){ return {u:u, l:lista.filter(function(t){ return t.unidad===u.usuario; })}; }).filter(function(g){ return g.l.length; });
+  $('contenido').innerHTML = '<h2>Informe de tareas críticas</h2>'+
+    '<p class="sub">Incluye las tareas abiertas vencidas, críticas (prioridad alta con más de 15 días), de riesgo alto o de prioridad alta por vencer. Pulse una tarea para registrar su línea de solución.</p>'+
+    kpis(kpisInforme(lista, sinSol))+
+    '<div class="barra" style="justify-content:space-between">'+selUnidad(f)+'<div class="descargas"><button class="btn" type="button" id="bInfPdf">Generar informe (PDF)</button><button class="btn sec" type="button" id="bInfXls">Descargar Excel</button></div></div>'+
+    (grupos.length ? grupos.map(function(g){
+      return '<div class="seccion"><h3>'+esc(g.u.nombre)+' · '+g.l.length+'</h3><div class="tabla-env"><table><thead><tr><th>ID</th><th>TAREA / ASUNTO</th><th>RESPONSABLE</th><th>LÍMITE</th><th>ALERTA</th><th>RIESGO POR DEMORA</th><th>LÍNEA DE SOLUCIÓN</th><th>PLAZO</th></tr></thead><tbody>'+
+        g.l.map(function(t){
+          return '<tr class="clic" data-id="'+esc(t.id)+'"><td style="white-space:nowrap"><b>'+esc(t.id)+'</b><br>'+chipT(t.tipo)+'</td>'+
+            '<td class="tarea">'+esc(t.tarea)+(t.mre&&t.instancia?'<small>'+esc(t.instancia)+'</small>':'')+'</td>'+
+            '<td style="min-width:140px">'+(t.responsable?esc(respTxt(t)):'<span class="chip a-SIN-FECHA">Sin asignar</span>')+'</td>'+
+            '<td style="white-space:nowrap">'+fTxt(t.fechaLim)+(t.faltan!==''?'<br><span class="marca-sm">'+(t.faltan<0?'hace '+(-t.faltan)+' días':t.faltan===0?'hoy':'en '+t.faltan+' días')+'</span>':'')+'</td>'+
+            '<td>'+chipA(t.alerta)+(t.nivelRiesgo?'<br><span class="marca-sm">Riesgo '+esc(t.nivelRiesgo.toLowerCase())+'</span>':'')+'</td>'+
+            '<td class="largo">'+esc(t.riesgo||'—')+'</td>'+
+            '<td class="largo" style="color:var(--texto)">'+(t.solucion?esc(t.solucion):'<span class="chip a-CRITICO">Sin definir</span>')+'</td>'+
+            '<td style="white-space:nowrap">'+fTxt(t.plazoSolucion)+'</td></tr>';
+        }).join('')+'</tbody></table></div></div>';
+    }).join('') : '<div class="msg ok">No hay tareas críticas en este momento.</div>');
+  enlazarFiltros(v, pintarInforme);
+  var titulo = 'Informe de tareas críticas', sub = f.unidad ? nombreUnidad(f.unidad) : 'Todas las unidades';
+  $('bInfPdf').addEventListener('click', function(){ imprimirInforme(titulo, sub, grupos, lista, sinSol); });
+  $('bInfXls').addEventListener('click', function(){
+    descargarExcel({ titulo: titulo, sub: sub, archivo: 'Informe_Tareas_Criticas'+(f.unidad?'_'+f.unidad:''), lista: lista, kpis: kpisInforme(lista, sinSol) });
+  });
+}
+function kpisInforme(lista, sinSol){
+  return [['TAREAS CRÍTICAS', lista.length, 1], ['VENCIDAS', lista.filter(function(t){return t.alerta==='VENCIDO';}).length, 1],
+          ['RIESGO ALTO', lista.filter(function(t){return t.nivelRiesgo==='Alto';}).length, 1],
+          ['SIN LÍNEA DE SOLUCIÓN', sinSol.length, 1], ['GESTIONES CON EL MRE', lista.filter(function(t){return t.mre;}).length]];
+}
+function imprimirInforme(titulo, sub, grupos, lista, sinSol){
+  var fila = function(t){ return '<tr><td>'+esc(t.id)+'</td><td>'+esc(t.tarea)+(t.mre&&t.instancia?'<br><i>'+esc(t.instancia)+'</i>':'')+'</td><td>'+esc(respTxt(t)||'Sin asignar')+'</td>'+
+    '<td>'+fTxt(t.fechaLim)+'</td><td>'+esc(t.alerta)+(t.nivelRiesgo?' · riesgo '+esc(t.nivelRiesgo.toLowerCase()):'')+'</td><td>'+esc(t.riesgo||'—')+'</td>'+
+    '<td>'+esc(t.solucion||'SIN DEFINIR')+'</td><td>'+fTxt(t.plazoSolucion)+'</td></tr>'; };
+  var cab = '<tr><th>ID</th><th>TAREA / ASUNTO</th><th>RESPONSABLE</th><th>LÍMITE</th><th>ALERTA</th><th>RIESGO POR DEMORA</th><th>LÍNEA DE SOLUCIÓN</th><th>PLAZO</th></tr>';
+  $('reporte').innerHTML = '<h1>BOLIVIA EN EL MUNDO · '+esc(titulo.toUpperCase())+'</h1>'+
+    '<p class="r-sub">'+esc(sub)+' · Fecha: '+sello()+' · Generado por '+esc(S.perfil.usuario)+'</p>'+
+    '<div class="r-kpi">'+kpisInforme(lista, sinSol).map(function(k){ return '<span>'+esc(k[0])+': <b>'+k[1]+'</b></span>'; }).join('')+'</div>'+
+    (grupos.length ? grupos.map(function(g){ return '<h2>'+esc(g.u.nombre)+' ('+g.l.length+')</h2><table><thead>'+cab+'</thead><tbody>'+g.l.map(fila).join('')+'</tbody></table>'; }).join('')
+      : '<p>No hay tareas críticas a la fecha.</p>')+
+    (sinSol.length ? '<h2>Tareas que requieren definir línea de solución ('+sinSol.length+')</h2><p>'+sinSol.map(function(t){ return esc(t.id)+' · '+esc(t.tarea); }).join('<br>')+'</p>' : '')+
+    '<p class="r-pie">Criterio: tareas abiertas vencidas, críticas (prioridad alta con más de 15 días), de riesgo alto o de prioridad alta por vencer. Seguimiento de tareas y trámites con el MRE.</p>';
+  setTimeout(function(){ window.print(); }, 50);
+}
+
+/* ---------- usuarios ---------- */
+function pintarUsuarios(lista){
+  $('contenido').innerHTML = '<h2>Usuarios y contraseñas</h2><p class="sub">Restablezca la contraseña de una unidad o desactive su acceso. Con una contraseña restablecida, la unidad deberá cambiarla al ingresar.</p>'+
+    '<div class="tabla-env"><table style="min-width:620px"><thead><tr><th>USUARIO</th><th>ESTADO</th><th>NUEVA CONTRASEÑA</th><th></th></tr></thead><tbody>'+
+    lista.map(function(u){
+      return '<tr><td><b>'+esc(u.usuario)+'</b></td><td>'+(u.activo?'<span class="chip a-CONCLUIDO">Activo</span>':'<span class="chip a-CRITICO">Inactivo</span>')+(u.debeCambiar?' <span class="chip a-SIN-FECHA">Clave temporal</span>':'')+'</td>'+
+        '<td><input type="text" data-clave="'+esc(u.usuario)+'" placeholder="Mín. 8, letras y números" autocomplete="off"></td>'+
+        '<td style="white-space:nowrap"><button class="btn peq" data-acc="reset" data-u="'+esc(u.usuario)+'">Restablecer</button> '+
+        (u.usuario==='PLANIFICACION'?'':'<button class="btn sec peq" data-acc="'+(u.activo?'off':'on')+'" data-u="'+esc(u.usuario)+'">'+(u.activo?'Desactivar':'Activar')+'</button>')+'</td></tr>';
+    }).join('')+'</tbody></table></div><div id="uMsg" class="msg error oculto" style="margin-top:12px"></div>';
+  $('contenido').querySelector('tbody').addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-acc]'); if (!b) return;
+    var u = b.dataset.u, p;
+    if (b.dataset.acc==='reset') p = srv('restablecerClave', S.token, u, document.querySelector('[data-clave="'+u+'"]').value).then(function(l){ pintarUsuarios(l); aviso('Contraseña de '+u+' restablecida'); });
+    else p = srv('cambiarEstadoUsuario', S.token, u, b.dataset.acc==='on').then(function(l){ pintarUsuarios(l); aviso('Usuario '+u+' actualizado'); });
+    p.catch(function(e){ mostrarError($('uMsg'), e.message); });
+  });
+}
+
+/* ---------- recuperar contraseña ---------- */
+$('lOlvido').addEventListener('click', function(){
+  var f = $('fRecup'); f.reset(); f.elements.usuario.value = $('lUsuario').value;
+  $('rPaso1').classList.remove('oculto'); $('rPaso2').classList.add('oculto'); $('rGuardar').classList.add('oculto');
+  mostrarError($('rMsg'), ''); $('rInfo').classList.add('oculto');
+  $('dRecup').showModal();
+});
+$('rCerrar').addEventListener('click', function(){ $('dRecup').close(); });
+$('rEnviar').addEventListener('click', function(){
+  var u = $('fRecup').elements.usuario.value;
+  mostrarError($('rMsg'), '');
+  if (!u){ mostrarError($('rMsg'), 'Seleccione su usuario.'); return; }
+  $('rEnviar').disabled = true;
+  srv('solicitarRecuperacion', u).then(function(r){
+    $('rInfo').textContent = r.msg; $('rInfo').classList.remove('oculto');
+    if (r.tipo === 'plan'){ $('rPaso1').classList.add('oculto'); $('rPaso2').classList.remove('oculto'); $('rGuardar').classList.remove('oculto'); $('fRecup').elements.codigo.focus(); }
+  }).catch(function(e){ mostrarError($('rMsg'), e.message); }).finally(function(){ $('rEnviar').disabled = false; });
+});
+$('fRecup').addEventListener('submit', function(ev){
+  ev.preventDefault(); var e = ev.target.elements;
+  if (e.nueva.value !== e.repetir.value){ mostrarError($('rMsg'), 'Las contraseñas nuevas no coinciden.'); return; }
+  $('rGuardar').disabled = true;
+  srv('restablecerConCodigo', e.usuario.value, e.codigo.value, e.nueva.value).then(function(){
+    $('dRecup').close(); $('lUsuario').value = e.usuario.value; $('lClave').value = ''; $('lClave').focus();
+    aviso('Contraseña actualizada. Ingrese con la nueva contraseña.');
+  }).catch(function(er){ mostrarError($('rMsg'), er.message); }).finally(function(){ $('rGuardar').disabled = false; });
+});
+
+/* ---------- contraseña ---------- */
+var claveObligatoria = false;
+function abrirClave(obl){
+  claveObligatoria = !!obl;
+  $('fClave').reset(); mostrarError($('dcMsg'), '');
+  $('dcTitulo').textContent = obl ? 'Defina su contraseña personal' : 'Cambiar contraseña';
+  $('dcNota').textContent = (obl ? 'Está usando una contraseña temporal. ' : '') + 'Mínimo 8 caracteres, con letras y números.';
+  $('dcCancelar').classList.toggle('oculto', claveObligatoria);
+  $('dClave').showModal();
+}
+$('bClave').addEventListener('click', function(){ abrirClave(false); });
+$('dcCancelar').addEventListener('click', function(){ $('dClave').close(); });
+$('dClave').addEventListener('cancel', function(ev){ if (claveObligatoria) ev.preventDefault(); });
+$('fClave').addEventListener('submit', function(ev){
+  ev.preventDefault(); var e = ev.target.elements;
+  if (e.nueva.value !== e.repetir.value){ mostrarError($('dcMsg'), 'Las contraseñas nuevas no coinciden.'); return; }
+  srv('cambiarClave', S.token, e.actual.value, e.nueva.value).then(function(){ claveObligatoria=false; S.perfil.debeCambiar=false; $('dClave').close(); aviso('Contraseña actualizada'); })
+    .catch(function(er){ mostrarError($('dcMsg'), er.message); });
+});
+
+(function(){
+  function reanudar(){
+    var t = leerToken(); if (!t) return;
+    S.token = t; cargando(true);
+    srv('sesion', t).then(iniciar).catch(function(){ salirLocal(); }).finally(function(){ cargando(false); });
+  }
+  try {
+    google.script.url.getLocation(function(loc){
+      var c = loc && loc.parameter && loc.parameter.pase;
+      if (!c) return reanudar();
+      cargando(true);
+      srv('sesionPase', c).then(function(r){
+        if (r.irProyectos) { window.open(r.irProyectos, '_top'); return; }
+        S.token = r.token; guardarToken(r.token); delete r.token; iniciar(r);
+      }).catch(function(){ reanudar(); }).finally(function(){ cargando(false); });
+    });
+  } catch (e) { reanudar(); }
+})();
+</script>
+</body>
+</html>
