@@ -9,7 +9,8 @@ Es la migración de una app en Google Apps Script (ver `referencias/`) a Python.
 - Flask-SQLAlchemy, Flask-Migrate (Alembic), PyMySQL → MariaDB 10.6+
 - Flask-Login (sesiones), Flask-WTF (formularios + CSRF), python-dotenv
 - Jinja2 + Bootstrap 5 (sin frameworks JS; JS mínimo en `static/js/`)
-- `reportlab` para el PDF del resumen ejecutivo (no requiere LibreOffice)
+- `reportlab` para los PDF propios (resumen ejecutivo, agenda, tablero con gráficos); no requiere LibreOffice
+- Chart.js 4.4.1 (CDN) solo en la vista Gráficos: única excepción a «sin frameworks JS»
 - Plantillas: `docxtpl` (Word) y `openpyxl` (Excel); PDF de plantillas con LibreOffice headless
 - Tests: pytest (SQLite en memoria; `TEST_DATABASE_URL` para usar otra base)
 
@@ -40,14 +41,14 @@ seg_pro/
     ├── extensions.py      # db, migrate, login_manager, csrf
     ├── models/            # usuario, unidad (+cargo), tarea (+subtarea, adjunto), catalogo,
     │                      # permiso_invitado, plantilla, auditoria
-    ├── controllers/       # auth, inicio, tareas, responsables, tablero, documentos,
+    ├── controllers/       # auth, inicio, tareas, responsables, tablero, agenda, documentos,
     │                      # admin/{usuarios, invitados, plantillas, catalogos}
     ├── services/          # permisos, usuarios, tareas, responsables, archivos, alertas, resumen,
-    │                      # invitados, plantillas, pdf, catalogos, auditoria
+    │                      # invitados, plantillas, pdf, catalogos, agenda, graficos, auditoria
     ├── forms/             # auth, usuarios, tareas, responsables, invitados, plantillas
     ├── utils/             # decoradores (@rol_requerido, @solo_lectura), fechas, paginacion
-    ├── templates/         # base.html, _macros.html, auth/, tareas/, tablero/, responsables/, admin/
-    └── static/            # css/app.css · js/{confirmar, subtareas, imprimir, invitados}.js
+    ├── templates/         # base.html, _macros.html, auth/, tareas/, tablero/, agenda/, responsables/, admin/
+    └── static/            # css/app.css · js/{confirmar, subtareas, imprimir, invitados, graficos}.js
 ```
 
 ## Rutas principales
@@ -58,6 +59,8 @@ seg_pro/
 | `/tareas/papelera` | admin | Copias de tareas eliminadas |
 | `/responsables` | admin, supervisor, unidad | Cargos y persona designada |
 | `/tablero/resumen` · `/tablero/resumen.pdf` | todos | Resumen ejecutivo y su PDF |
+| `/agenda` · `/agenda/agenda.pdf` | todos | Agenda Despacho del mes (`?mes=AAAA-MM`) y su PDF |
+| `/tablero/graficos` · `/tablero/graficos.pdf` | todos | Tablero con gráficos y su PDF |
 | `/tablero/alertas` · `/informe` · `/cronograma` | admin, supervisor, unidad | Vistas del tablero |
 | `/documentos/<plantilla>/{tarea/<id>, listado, informe}` | admin, supervisor, unidad | Generar documento (`?formato=original\|pdf`) |
 | `/admin/{usuarios, invitados, plantillas, catalogos}` | admin | Administración |
@@ -70,7 +73,7 @@ Cada persona tiene su propio usuario y contraseña, ligado a una unidad (salvo a
 | `admin` (Planificación) | Todo | Todo: tareas de cualquier unidad, reasignar tareas, mover cargos, usuarios, invitados, plantillas, catálogos, papelera |
 | `supervisor` (DGE) | Todo | Editar tareas de cualquier unidad, reasignarlas y gestionar cargos (sin moverlos). No administra usuarios, invitados, plantillas ni catálogos |
 | `unidad` | Solo su unidad | Crear/editar/eliminar sus tareas, adjuntos, subtareas y cargos de su unidad; generar documentos |
-| `invitado` | Solo el resumen ejecutivo, de las unidades que el admin configure | Leerlo y descargarlo en PDF. Nunca modifica nada |
+| `invitado` | Resumen ejecutivo, Agenda y Gráficos, solo gestiones con el MRE de las unidades que el admin configure | Leerlos y descargarlos en PDF. Nunca modifica nada |
 
 - **Contraseñas:** hash con `werkzeug.security`. Mínimo 8 caracteres con letras y números.
 - **Crear usuario:** el admin escribe la contraseña inicial (con confirmación). Opcionalmente marca «pedir cambio al primer ingreso» (`debe_cambiar_clave`); por defecto no. Al crear un invitado se pasa a configurar sus unidades.
@@ -80,10 +83,12 @@ Cada persona tiene su propio usuario y contraseña, ligado a una unidad (salvo a
 - Siempre debe existir al menos un admin activo.
 
 ### Invitado
-Solo ve el **resumen ejecutivo** (`/tablero/resumen`) y lo descarga en PDF (`/tablero/resumen.pdf`).
+Solo ve tres vistas (`VISTAS_INVITADO` en `models/permiso_invitado.py`), cada una con su PDF:
+**resumen ejecutivo**, **agenda** y **gráficos**. En las tres ve solo gestiones con el MRE (nunca tareas internas;
+`permisos.solo_gestiones_mre`) y sin enlaces al detalle de las tareas.
 No ve tareas, alertas, informe, cronograma, responsables, adjuntos ni genera documentos de plantillas.
 Tabla `permiso_invitado` por usuario invitado: unidades permitidas (`todas_unidades` o una lista). Sin unidades no ve datos.
-Se configura en Admin › Invitados. Cada descarga del PDF queda en la auditoría.
+Se configura en Admin › Invitados. Cada descarga de PDF (de cualquier usuario) queda en la auditoría (`descargar_pdf`).
 
 `@solo_lectura` y la guarda global rechazan con 403 cualquier POST/PUT/PATCH/DELETE de un invitado (excepto logout y cambiar su propia clave).
 `services/permisos.py` filtra las consultas: ningún controlador consulta tareas sin pasar por ahí
@@ -129,6 +134,31 @@ Los listados se ordenan por severidad; como la alerta se calcula en Python, se f
 - **Informe crítico:** tareas críticas por unidad, con línea de solución; botón Imprimir.
 - **Cronograma:** barras calculadas en el servidor (posiciones en %), dibujadas solo con CSS.
 
+### Agenda Despacho (`services/agenda.py`) — Etapa 6
+Sección propia de la app (ya no se conecta con Google Sheets). Se arma con los datos de las tareas, sin datos propios:
+- Eventos: **fecha límite** de cada tarea abierta (◆) y **recordatorios** = subtareas con fecha (•; las hechas, tachadas).
+- Calendario mensual (lunes a domingo), cada día coloreado con su peor alerta; navegación por mes; «Próximos 14 días».
+- Estado de agenda (como la app original): Concluido → Concluida, Pendiente → Pendiente, Observado / Devuelto → Bloqueada, el resto → En gestión.
+- Filtros: unidad y responsable. PDF del mes: indicadores y eventos día por día.
+
+### Gráficos (`services/graficos.py`, `static/js/graficos.js`)
+Un gráfico por pregunta. Los datos los arma el servidor (ya filtrados por permisos) y se pasan como JSON en la página:
+| Bloque | Pregunta |
+|---|---|
+| Tarjetas: pendientes, vencidas, por vencer, sin respuesta del MRE, concluidas del mes (± % vs. mes anterior) | ¿Cómo estamos hoy? |
+| Barras apiladas por unidad y alerta (solo si ve varias unidades) / «Próximos vencimientos» (unidad) | ¿Qué unidad está más atrasada? |
+| Velocímetro: % concluidas a tiempo, con marca de meta `META_CUMPLIMIENTO` | ¿Cumplimos los plazos? |
+| Línea: creadas contra concluidas, 12 meses | ¿Entra más trabajo del que cerramos? |
+| Embudo: tareas abiertas por estado (orden del catálogo) | ¿Dónde se traban los trámites? |
+| Mini calendario del mes (enlaza a la Agenda) | ¿Qué vence este mes? |
+| Instancias del MRE con más pendientes | ¿A quién hay que insistir? |
+| Anillos de cumplimiento por unidad (solo si ve varias unidades) | Comparación entre unidades |
+
+- Colores de alerta en 4 familias: rojo (vencido/crítico), ámbar (por vencer/seguimiento), azul (en curso), gris (sin fecha); verde = concluido/cumple.
+- Al pulsar un gráfico se abre la lista de tareas ya filtrada (solo si el usuario puede ver tareas; el invitado no).
+- PDF con los mismos bloques dibujados con `reportlab.graphics` (sin JS).
+- «Cuántas vencidas había cada día» no se puede graficar porque las alertas no se guardan; si se necesita, haría falta una tabla `foto_diaria` y un comando nocturno.
+
 ## Plantillas con marcadores (Admin › Plantillas)
 El admin sube `.docx` o `.xlsx` (máx. 10 MB) a `storage/plantillas/` e indica su **alcance**: `tarea` (ficha), `listado` (lo que muestra el filtro) o `informe` (solo tareas críticas).
 - Word: `docxtpl` con `jinja2.sandbox.SandboxedEnvironment` y autoescape. Listas con `{% for t in tareas %}…{% endfor %}`; en tablas, `{%tr for t in tareas %}` repite la fila.
@@ -141,7 +171,7 @@ Marcadores principales: `unidad.nombre`, `unidad.sigla`, `tarea.codigo`, `tarea.
 
 ## Configuración (`config.py` y `.env`)
 - `.env`: `APP_CONFIG`, `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE`, `SOFFICE_PATH` (opcional), `STORAGE_DIR` (opcional).
-- `config.py`: sesión y bloqueo (`HORAS_SESION`, `MAX_INTENTOS`, `MINUTOS_BLOQUEO`), umbrales de alertas, `MAX_MB_ADJUNTO`, `EXTENSIONES_ADJUNTO`, `TAREAS_POR_PAGINA`, `SOFFICE_TIMEOUT`.
+- `config.py`: sesión y bloqueo (`HORAS_SESION`, `MAX_INTENTOS`, `MINUTOS_BLOQUEO`), umbrales de alertas, `META_CUMPLIMIENTO`, `MAX_MB_ADJUNTO`, `EXTENSIONES_ADJUNTO`, `TAREAS_POR_PAGINA`, `SOFFICE_TIMEOUT`.
 
 ## Comandos
 ```
@@ -158,41 +188,10 @@ flask db check                   # verifica que modelos y migraciones coincidan
 1. ✅ Modelos, migración inicial, comandos CLI, login con roles (incluido invitado) y admin de usuarios.
 2. ✅ Tareas: CRUD, responsables, subtareas, dependencias, adjuntos, papelera.
 3. ✅ Tablero: resumen ejecutivo, alertas, informe crítico, cronograma, filtros.
-4. ✅ Invitados: solo resumen ejecutivo + PDF, configuración de unidades.
+4. ✅ Invitados: configuración de unidades y vistas de solo lectura con PDF.
 5. ✅ Plantillas: subida, validación, generación Word/Excel/PDF. ✅ Administración de catálogos.
-6. (Opcional) Sincronización con la Agenda Despacho vía Google Sheets API (campo `tarea.agenda_id` ya existe).
+6. ✅ Agenda Despacho como sección de la app (sin Google Sheets) para todos los roles, con PDF. ✅ Tablero con gráficos y su PDF.
+   (El campo `tarea.agenda_id` quedó de la integración anterior y no se usa.)
 
 Cada etapa termina con tests de permisos: una unidad no ve otra unidad, un invitado no puede escribir.
-Tests por área: `test_auth`, `test_usuarios`, `test_permisos`, `test_tareas`, `test_responsables`, `test_tablero`, `test_invitados`, `test_plantillas`, `test_catalogos`, `test_cli`.
-
-## Propuesta pendiente: tablero con gráficos
-No implementado. Notas de diseño para una futura versión gráfica del tablero.
-
-### Qué gráfico usar para qué
-| Gráfico | En Seguimiento MRE mostraría | Pregunta que responde |
-|---|---|---|
-| Tarjetas de número | Pendientes, Vencidas, Por vencer, Sin respuesta del MRE, Concluidas del mes (con «+10 %» frente al mes anterior) | ¿Cómo estamos hoy? |
-| Barras agrupadas de colores | Pendientes por unidad, cada barra dividida por alerta | ¿Qué unidad está más atrasada? |
-| Velocímetro (gauge) | % de tareas concluidas antes de su fecha límite, con una marca de meta (ej. 80 %) | ¿Cumplimos los plazos? |
-| Línea | Tareas creadas contra concluidas, por mes | ¿Entra más trabajo del que cerramos? |
-| Barras en flecha (embudo) | Embudo de estados: cuántos trámites hay en DGE → Ventanilla → MRE → Respuesta | ¿Dónde se traban los trámites? |
-| Calendario | Fechas límite del mes; cada día con el color de su peor alerta | ¿Qué vence esta semana? |
-| Lista ordenada | Instancias del MRE con más trámites pendientes | ¿A quién hay que insistir? |
-| Anillos de porcentaje | Cumplimiento por unidad, uno por unidad | Comparación rápida entre unidades |
-
-Se dejan fuera: la dona (con más de 4 porciones nadie compara bien; las barras lo dicen mejor) y el círculo grande de porcentaje (repetiría el velocímetro). Un solo gráfico por pregunta.
-
-### Según el rol
-- **Planificación / DGE:** el tablero completo. Lo que más importa arriba a la izquierda: tarjetas, luego unidades y cumplimiento.
-- **Unidad:** el mismo tablero filtrado a su unidad. En lugar de «Pendientes por unidad», «Mis próximos vencimientos» (lista); sin anillos por unidad.
-- **Invitado:** según la regla actual, solo vería los bloques del resumen ejecutivo (gestiones con el MRE) de sus unidades, filtrados por `services/permisos.py`, con el botón «Descargar PDF».
-
-### Reglas visuales
-- Los mismos colores de alerta en todo el tablero: rojo = vencido, ámbar = por vencer, verde = concluido, gris = sin fecha.
-- Cada gráfico se puede pulsar y lleva a la lista de tareas ya filtrada (ej. barra roja de UAF → tareas vencidas de UAF).
-- Nada de 3D, sombras ni más de 5 colores.
-
-### Cómo hacerlo técnicamente
-- Librería: Chart.js (excepción acotada a «sin frameworks JS»; liviana y compatible con Bootstrap). Velocímetro con un plugin pequeño. El calendario, como tabla de Bootstrap con celdas coloreadas.
-- Datos: una ruta `/tablero/datos` en `controllers/tablero.py` que devuelve JSON armado por `services/resumen.py`, siempre pasando por los permisos.
-- El gráfico de líneas necesita historia. Creadas contra concluidas sale de las fechas existentes, pero «cuántas vencidas había cada día» no, porque las alertas no se guardan: haría falta una tabla `foto_diaria` y un comando `flask foto-diaria` que se ejecute cada noche (cron).
+Tests por área: `test_auth`, `test_usuarios`, `test_permisos`, `test_tareas`, `test_responsables`, `test_tablero`, `test_invitados`, `test_plantillas`, `test_catalogos`, `test_agenda_graficos`, `test_cli`.

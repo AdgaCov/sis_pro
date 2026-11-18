@@ -1,7 +1,7 @@
 from app.extensions import db
 
-# El invitado solo ve el resumen ejecutivo (y lo descarga en PDF), de las unidades que el admin le asigne.
-VISTA_INVITADO = "resumen"
+# El invitado solo ve estas vistas (y sus PDF), con las gestiones con el MRE de las unidades que el admin le asigne.
+VISTAS_INVITADO = ("resumen", "agenda", "graficos")
 
 permiso_invitado_unidad = db.Table(
     "permiso_invitado_unidad",

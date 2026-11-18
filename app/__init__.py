@@ -64,6 +64,7 @@ def _registrar_sesion(app: Flask) -> None:
 
 def _registrar_blueprints(app: Flask) -> None:
     from app.controllers.admin.catalogos import bp as admin_catalogos_bp
+    from app.controllers.agenda import bp as agenda_bp
     from app.controllers.admin.invitados import bp as admin_invitados_bp
     from app.controllers.admin.plantillas import bp as admin_plantillas_bp
     from app.controllers.admin.usuarios import bp as admin_usuarios_bp
@@ -84,6 +85,7 @@ def _registrar_blueprints(app: Flask) -> None:
     app.register_blueprint(tareas_bp)
     app.register_blueprint(responsables_bp)
     app.register_blueprint(tablero_bp)
+    app.register_blueprint(agenda_bp)
 
 
 def _registrar_plantillas(app: Flask) -> None:

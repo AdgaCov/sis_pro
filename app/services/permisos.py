@@ -5,7 +5,7 @@ Ningún controlador debe hacer `Tarea.query` directamente: siempre `consulta_tar
 from sqlalchemy import false
 
 from app.models import Tarea, Unidad, Usuario
-from app.models.permiso_invitado import VISTA_INVITADO
+from app.models.permiso_invitado import VISTAS_INVITADO
 
 
 def ids_unidades_visibles(usuario: Usuario) -> list[int] | None:
@@ -75,8 +75,13 @@ def puede_ver_vista(usuario: Usuario, vista: str) -> bool:
     if not usuario or not usuario.is_authenticated or not usuario.activo:
         return False
     if usuario.es_invitado:
-        return vista == VISTA_INVITADO
+        return vista in VISTAS_INVITADO
     return True
+
+
+def solo_gestiones_mre(usuario: Usuario) -> bool:
+    """El invitado solo ve gestiones con el MRE (nunca tareas internas) en agenda y gráficos."""
+    return bool(usuario and usuario.is_authenticated and usuario.es_invitado)
 
 
 def puede_ver_adjuntos(usuario: Usuario, tarea: Tarea) -> bool:

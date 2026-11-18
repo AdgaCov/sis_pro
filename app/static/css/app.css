@@ -127,3 +127,41 @@ body { background: var(--fondo); color: var(--texto); }
 .lista-checks ul { list-style: none; padding-left: 0; margin: 0; }
 .lista-checks li { display: flex; gap: .5rem; align-items: center; padding: .15rem 0; }
 fieldset:disabled .lista-checks { opacity: .5; }
+
+/* agenda */
+.calendario { table-layout: fixed; min-width: 760px; }
+.calendario td { height: 110px; vertical-align: top; padding: 4px; font-size: .72rem; }
+.calendario td.fuera { background: var(--gris-f); color: var(--suave); }
+.calendario td.es-hoy { box-shadow: inset 0 0 0 2px var(--azul); }
+.calendario td.dia-VENCIDO { background: #FDECEA; } .calendario td.dia-CRITICO { background: #FDECEA; }
+.calendario td.dia-POR-VENCER, .calendario td.dia-SEGUIMIENTO { background: #FFF4DE; }
+.ag-num { font-weight: 700; color: var(--azul); }
+.ag-ev { border-left: 3px solid var(--suave); padding: 1px 4px; margin-top: 2px; background: rgba(255,255,255,.75);
+         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-ev.hecho { text-decoration: line-through; color: var(--suave); }
+.c-borde-VENCIDO { border-left-color: #B42318; } .c-borde-CRITICO { border-left-color: #D9534F; }
+.c-borde-POR-VENCER { border-left-color: #D49A2A; } .c-borde-SEGUIMIENTO { border-left-color: #E3B25A; }
+.c-borde-EN-CURSO { border-left-color: #2E4A7D; } .c-borde-CONCLUIDO { border-left-color: #3B9A63; }
+.c-borde-SIN-FECHA { border-left-color: #8A93A6; }
+
+/* gráficos */
+.grafico { position: relative; }
+a.kpi-enlace { text-decoration: none; color: inherit; display: block; }
+a.kpi-enlace:hover { border-color: var(--azul); }
+.kpi small { display: block; font-size: .7rem; }
+.mini-calendario { table-layout: fixed; font-size: .75rem; }
+.mini-calendario th { font-weight: 600; color: var(--suave); }
+.mini-calendario td { height: 34px; text-align: right; vertical-align: top; position: relative; }
+.mini-calendario td.fuera { color: #B8BFCC; background: var(--gris-f); }
+.mini-calendario td.es-hoy { box-shadow: inset 0 0 0 2px var(--azul); font-weight: 700; }
+.mini-calendario td.dia-VENCIDO, .mini-calendario td.dia-CRITICO { background: #F6C9C4; }
+.mini-calendario td.dia-POR-VENCER, .mini-calendario td.dia-SEGUIMIENTO { background: #FBE3B5; }
+.mini-calendario td.dia-EN-CURSO { background: #D6E0F2; }
+.mini-calendario td.dia-SIN-FECHA { background: var(--gris-f); }
+.mini-n { position: absolute; left: 4px; bottom: 2px; font-size: .65rem; font-weight: 700; color: var(--azul); }
+.barra-lista { height: 6px; background: var(--gris-f); border-radius: 3px; overflow: hidden; }
+.barra-lista span { display: block; height: 100%; background: var(--azul-2); }
+.anillos { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.anillo { display: flex; flex-direction: column; align-items: center; gap: .15rem; }
+.anillo-vacio { width: 110px; height: 110px; border-radius: 50%; border: 12px solid var(--gris-f); display: flex;
+                align-items: center; justify-content: center; color: var(--suave); }

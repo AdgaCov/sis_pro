@@ -3,8 +3,8 @@ from flask_login import current_user
 
 from app.controllers.tareas import formulario_filtros, texto_filtros
 from app.extensions import db
-from app.services import auditoria, pdf, permisos, plantillas, resumen
-from app.utils.fechas import a_local, ahora_utc, formato_fecha_hora
+from app.services import agenda, auditoria, graficos, pdf, permisos, plantillas, resumen
+from app.utils.fechas import a_local, ahora_utc, formato_fecha_hora, hoy_local
 
 bp = Blueprint("tablero", __name__, url_prefix="/tablero")
 
@@ -87,3 +87,47 @@ def cronograma():
     agrupar = ctx["varias_unidades"] and not filtro.unidad_id.data
     datos = resumen.cronograma(infos, ctx["unidades"], agrupar)
     return render_template("tablero/cronograma.html", datos=datos, **ctx)
+
+
+# ------------------------------------------------------------------ gráficos
+def _datos_graficos(filtro):
+    ctx = _contexto(filtro)
+    solo_mre = permisos.solo_gestiones_mre(current_user)
+    infos = resumen.filtrar(resumen.cargar(current_user), {"unidad_id": filtro.unidad_id.data, "ver_concluidas": True},
+                            solo_mre=solo_mre)
+    por_unidad = ctx["varias_unidades"] and not filtro.unidad_id.data
+    datos = graficos.datos(infos, ctx["unidades"], por_unidad, current_app.config["META_CUMPLIMIENTO"])
+    return ctx, infos, datos, por_unidad, solo_mre
+
+
+@bp.route("/graficos")
+def graficos_vista():
+    _exigir("graficos")
+    filtro = formulario_filtros()
+    ctx, infos, datos, por_unidad, solo_mre = _datos_graficos(filtro)
+    hoy = hoy_local()
+    mes = hoy.replace(day=1)
+    desde, hasta = agenda.rango_calendario(mes)
+    calendario = agenda.calendario(mes, agenda.eventos(infos, desde, hasta, hoy), hoy)
+    return render_template("tablero/graficos.html", datos=datos, por_unidad=por_unidad, solo_mre=solo_mre,
+                           proximos=graficos.proximos_vencimientos(infos), calendario=calendario,
+                           titulo_mes=agenda.nombre_mes(mes), dias_semana=agenda.DIAS_SEMANA, **ctx)
+
+
+@bp.route("/graficos.pdf")
+def graficos_pdf():
+    _exigir("graficos")
+    filtro = formulario_filtros()
+    ctx, infos, datos, por_unidad, solo_mre = _datos_graficos(filtro)
+    alcance = "Unidades: " + (", ".join(u.sigla for u in ctx["unidades"]) or "ninguna")
+    if solo_mre:
+        alcance += " · solo gestiones con el MRE"
+    generado = f"Generado el {formato_fecha_hora(ahora_utc())} por {current_user.nombre_usuario}"
+    contenido = pdf.graficos(datos, por_unidad, graficos.proximos_vencimientos(infos), alcance, generado)
+    auditoria.registrar("descargar_pdf", current_user, "graficos", None, {"tareas": len(infos)})
+    db.session.commit()
+    resp = make_response(contenido)
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = f'attachment; filename="Tablero_Graficos_{a_local(ahora_utc()):%Y%m%d}.pdf"'
+    resp.headers["Cache-Control"] = "no-store"
+    return resp

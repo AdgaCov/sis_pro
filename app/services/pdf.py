@@ -11,6 +11,10 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.graphics.charts.barcharts import HorizontalBarChart, VerticalBarChart
+from reportlab.graphics.charts.legends import Legend
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
+from reportlab.graphics.shapes import Drawing, String
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
@@ -147,6 +151,214 @@ def resumen_ejecutivo(datos: dict, detalle: list, alcance: str, filtros: str, ge
     h.append(Paragraph("Seguimiento de tareas y trámites con el MRE · Las tareas internas no se incluyen.", E["pie"]))
     pie = f"Resumen ejecutivo · {generado}"
     doc.build(h, onFirstPage=lambda c, d: _pie(c, d, pie), onLaterPages=lambda c, d: _pie(c, d, pie))
+    return buf.getvalue()
+
+
+def _documento(buf, titulo: str):
+    return SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=12 * mm, rightMargin=12 * mm,
+                             topMargin=12 * mm, bottomMargin=14 * mm, title=titulo, author="Bolivia en el Mundo")
+
+
+def _kpis(kpis, ancho) -> Table:
+    celdas = [[Paragraph(escape(k.upper()), E["kpi_et"]) for k, _, _ in kpis],
+              [Paragraph(str(v), ParagraphStyle("v", parent=E["kpi_val"], textColor=ROJO if r and v else AZUL))
+               for _, v, r in kpis]]
+    t = Table(celdas, colWidths=[ancho / len(kpis)] * len(kpis))
+    t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.4, BORDE), ("INNERGRID", (0, 0), (-1, -1), 0.4, BORDE),
+                           ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    return t
+
+
+def _chip(alerta: str) -> Paragraph:
+    return Paragraph(f'<font color="{COLOR_ALERTA.get(alerta, GRIS).hexval()}"><b>{escape(alerta)}</b></font>',
+                     E["celda"])
+
+
+DIAS = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+
+
+def agenda(titulo_mes: str, dias: list, kpis: list, alcance: str, generado: str) -> bytes:
+    """PDF de la Agenda Despacho de un mes: indicadores y eventos día por día."""
+    buf = io.BytesIO()
+    doc = _documento(buf, f"Agenda Despacho · {titulo_mes}")
+    ancho = doc.width
+    h = [Paragraph(escape(f"BOLIVIA EN EL MUNDO · AGENDA DESPACHO · {titulo_mes.upper()}"), E["titulo"]),
+         Paragraph(escape(f"{alcance} · {generado}"), E["sub"]), _kpis(kpis, ancho)]
+    cab = ("Evento", "Código", "Unidad", "Tarea / recordatorio", "Responsable", "Estado", "Agenda", "Alerta")
+    proporciones = (0.09, 0.08, 0.07, 0.34, 0.15, 0.11, 0.07, 0.09)
+    if not dias:
+        h.append(Spacer(1, 10))
+        h.append(Paragraph("No hay fechas límite ni recordatorios en este mes.", E["celda"]))
+    for fecha, evs in dias:
+        filas = [[_p(c, "celda_cab") for c in cab]]
+        for e in evs:
+            t = e["info"].t
+            texto = t.asunto if e["tipo"] == "limite" else f"{e['texto']}  (tarea: {t.asunto})"
+            resp = ""
+            if t.responsable:
+                persona = t.responsable.persona
+                resp = t.responsable.nombre + (f" ({persona})" if persona else "")
+            filas.append([
+                _p("Fecha límite" if e["tipo"] == "limite" else ("Recordatorio (hecho)" if e["hecho"] else "Recordatorio")),
+                _p(t.codigo), _p(t.unidad.sigla), _p(texto), _p(resp or "Sin asignar"),
+                _p(t.estado.valor), _p(e["estado_agenda"]), _chip(e["alerta"]),
+            ])
+        titulo = f"{DIAS[fecha.weekday()]} {formato_fecha(fecha)} · {len(evs)} evento(s)"
+        h.append(KeepTogether([Paragraph(escape(titulo), E["h2"]),
+                               _tabla(filas, [ancho * p for p in proporciones])]))
+    h.append(Spacer(1, 6))
+    h.append(Paragraph("Fechas límite de tareas abiertas y recordatorios (subtareas con fecha). "
+                       "Estado de agenda: Pendiente, En gestión, Bloqueada (observado / devuelto) o Concluida.",
+                       E["pie"]))
+    pie = f"Agenda Despacho · {titulo_mes} · {generado}"
+    doc.build(h, onFirstPage=lambda c, d: _pie(c, d, pie), onLaterPages=lambda c, d: _pie(c, d, pie))
+    return buf.getvalue()
+
+
+def _leyenda(pares, x, y, ancho) -> Legend:
+    """Leyenda debajo del gráfico, en hasta 3 columnas."""
+    ley = Legend()
+    ley.x, ley.y = x, y
+    ley.alignment = "left"
+    ley.columnMaximum = max(1, -(-len(pares) // 3))
+    ley.deltax = ancho / 3
+    ley.deltay = 9
+    ley.dx = ley.dy = 6
+    ley.fontName, ley.fontSize = "Helvetica", 7
+    ley.colorNamePairs = pares
+    return ley
+
+
+def _fuentes(g) -> None:
+    for eje in (g.categoryAxis, g.valueAxis):
+        eje.labels.fontName = "Helvetica"
+        eje.labels.fontSize = 7
+
+
+def _barras_unidad(barras, ancho) -> Drawing:
+    alto = 175
+    dib = Drawing(ancho, alto)
+    g = VerticalBarChart()
+    g.x, g.y, g.width, g.height = 25, 40, ancho - 30, alto - 45
+    g.data = [s["valores"] for s in barras["series"]] or [[0]]
+    g.categoryAxis.categoryNames = barras["etiquetas"]
+    g.categoryAxis.labels.fontSize = 7
+    g.categoryAxis.style = "stacked"
+    g.valueAxis.valueMin = 0
+    g.valueAxis.labels.fontSize = 7
+    maximo = max([sum(v) for v in zip(*g.data)] or [0])
+    g.valueAxis.valueMax = max(4, maximo)
+    g.valueAxis.valueStep = max(1, round(g.valueAxis.valueMax / 4))
+    for k, s in enumerate(barras["series"]):
+        g.bars[k].fillColor = colors.HexColor(s["color"])
+        g.bars[k].strokeColor = None
+    _fuentes(g)
+    dib.add(g)
+    dib.add(_leyenda([(colors.HexColor(s["color"]), s["alerta"]) for s in barras["series"]], 25, 22, ancho - 30))
+    return dib
+
+
+def _lineas_mes(mensual, ancho) -> Drawing:
+    alto = 150
+    dib = Drawing(ancho, alto)
+    g = HorizontalLineChart()
+    g.x, g.y, g.width, g.height = 25, 32, ancho - 30, alto - 37
+    g.data = [mensual["creadas"], mensual["concluidas"]]
+    g.categoryAxis.categoryNames = mensual["etiquetas"]
+    g.categoryAxis.labels.fontSize = 7
+    g.valueAxis.valueMin = 0
+    g.valueAxis.valueMax = max(4, max(mensual["creadas"] + mensual["concluidas"] or [0]))
+    g.valueAxis.valueStep = max(1, round(g.valueAxis.valueMax / 4))
+    g.valueAxis.labels.fontSize = 7
+    for k, color in enumerate(("#2E4A7D", "#3B9A63")):
+        g.lines[k].strokeColor = colors.HexColor(color)
+        g.lines[k].strokeWidth = 1.6
+    _fuentes(g)
+    dib.add(g)
+    dib.add(_leyenda([(colors.HexColor("#2E4A7D"), "Creadas"), (colors.HexColor("#3B9A63"), "Concluidas")],
+                     25, 12, ancho - 30))
+    return dib
+
+
+def _embudo(embudo, ancho) -> Drawing:
+    alto = 30 + 18 * max(1, len(embudo))
+    dib = Drawing(ancho, alto)
+    if not embudo:
+        dib.add(String(0, alto / 2, "Sin tareas abiertas.", fontName="Helvetica", fontSize=8))
+        return dib
+    g = HorizontalBarChart()
+    g.x, g.y, g.width, g.height = 175, 15, ancho - 185, alto - 25
+    g.data = [[x["valor"] for x in reversed(embudo)]]
+    g.categoryAxis.categoryNames = [x["estado"][:40] for x in reversed(embudo)]
+    g.categoryAxis.labels.fontSize = 7
+    g.categoryAxis.labels.boxAnchor = "e"
+    g.valueAxis.valueMin = 0
+    g.valueAxis.valueMax = max(4, max(g.data[0]))
+    g.valueAxis.valueStep = max(1, round(g.valueAxis.valueMax / 4))
+    g.valueAxis.labels.fontSize = 7
+    g.bars[0].fillColor = colors.HexColor("#2E4A7D")
+    g.bars[0].strokeColor = None
+    _fuentes(g)
+    dib.add(g)
+    return dib
+
+
+def graficos(datos: dict, por_unidad: bool, proximos: list, alcance: str, generado: str) -> bytes:
+    """PDF del tablero gráfico: los mismos bloques de la pantalla, dibujados con reportlab."""
+    buf = io.BytesIO()
+    doc = _documento(buf, "Tablero · Seguimiento MRE")
+    ancho = doc.width
+    mitad = (ancho - 8 * mm) / 2
+    kpis = [(k["titulo"], k["valor"], k["alerta"]) for k in datos["tarjetas"]]
+    h = [Paragraph("BOLIVIA EN EL MUNDO · TABLERO DE SEGUIMIENTO MRE", E["titulo"]),
+         Paragraph(escape(f"{alcance} · {generado}"), E["sub"]), _kpis(kpis, ancho)]
+
+    var = datos["tarjetas"][-1].get("variacion")
+    if var is not None:
+        h.append(Paragraph(escape(f"Concluidas este mes: {'+' if var > 0 else ''}{var} % frente al mes anterior."),
+                           E["sub"]))
+
+    c = datos["cumplimiento"]
+    if c["pct"] is None:
+        texto_c = "Aún no hay tareas concluidas con fecha límite."
+    else:
+        estado = "cumple" if c["pct"] >= c["meta"] else "no alcanza"
+        texto_c = (f"{c['pct']} % de {c['base']} tareas concluidas con fecha límite se cerraron a tiempo "
+                   f"(meta {c['meta']} %: {estado}).")
+
+    if por_unidad:
+        bloque_izq = [Paragraph("Pendientes por unidad, por alerta", E["h2"]), _barras_unidad(datos["barras"], mitad)]
+    else:
+        filas = [[_p(x, "celda_cab") for x in ("Código", "Tarea / asunto", "Límite", "Alerta")]]
+        filas += [[_p(i.t.codigo), _p(i.t.asunto), _p(formato_fecha(i.t.fecha_limite)), _chip(i.alerta)]
+                  for i in proximos] or [[_p("Sin fechas límite pendientes."), _p(""), _p(""), _p("")]]
+        bloque_izq = [Paragraph("Próximos vencimientos", E["h2"]),
+                      _tabla(filas, [mitad * 0.17, mitad * 0.53, mitad * 0.15, mitad * 0.15])]
+    bloque_der = [Paragraph("Cumplimiento de plazos", E["h2"]), Paragraph(escape(texto_c), E["celda"])]
+    if por_unidad and datos["anillos"]:
+        filas = [[_p("Unidad", "celda_cab"), _p("A tiempo", "celda_cab"), _p("Base", "celda_cab")]]
+        filas += [[_p(a["sigla"]), _p("—" if a["pct"] is None else f"{a['pct']} %", "num"), _p(a["base"], "num")]
+                  for a in datos["anillos"]]
+        bloque_der += [Spacer(1, 4), _tabla(filas, [mitad * 0.5, mitad * 0.25, mitad * 0.25])]
+    filas = [[_p("Instancia del MRE", "celda_cab"), _p("Pendientes", "celda_cab")]]
+    filas += [[_p(x["nombre"]), _p(x["valor"], "num")] for x in datos["instancias"]] or \
+        [[_p("Sin gestiones pendientes con el MRE."), _p("")]]
+    bloque_der += [Paragraph("Instancias del MRE con más pendientes", E["h2"]),
+                   _tabla(filas, [mitad * 0.8, mitad * 0.2])]
+
+    def lado_a_lado(izq, der):
+        t = Table([[izq, der]], colWidths=[mitad + 4 * mm, mitad + 4 * mm])
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                               ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm)]))
+        return t
+
+    h.append(lado_a_lado(bloque_izq, bloque_der))
+    h.append(lado_a_lado(
+        [Paragraph("Creadas contra concluidas (12 meses)", E["h2"]), _lineas_mes(datos["mensual"], mitad)],
+        [Paragraph("Embudo de estados (tareas abiertas)", E["h2"]), _embudo(datos["embudo"], mitad)],
+    ))
+    pie = f"Tablero · {generado}"
+    doc.build(h, onFirstPage=lambda cv, d: _pie(cv, d, pie), onLaterPages=lambda cv, d: _pie(cv, d, pie))
     return buf.getvalue()
 
 

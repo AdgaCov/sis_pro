@@ -33,6 +33,7 @@ class Config:
     DIAS_SEGUIMIENTO = 7
     DIAS_SIN_ACTUALIZAR = 7
     DIAS_CRITICO = 15
+    META_CUMPLIMIENTO = 80  # % de tareas concluidas a tiempo (marca del velocímetro en Gráficos)
 
     # Archivos
     MAX_MB_ADJUNTO = 10

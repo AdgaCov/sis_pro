@@ -26,7 +26,8 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('tareas.lista') }}">Tareas</a></li>
         {% endif %}
         {% for vista, endpoint, texto in [('resumen', 'tablero.resumen_ejecutivo', 'Resumen'), ('alertas', 'tablero.alertas', 'Alertas'),
-                                          ('informe', 'tablero.informe', 'Informe crítico'), ('cronograma', 'tablero.cronograma', 'Cronograma')] %}
+                                          ('informe', 'tablero.informe', 'Informe crítico'), ('cronograma', 'tablero.cronograma', 'Cronograma'),
+                                          ('agenda', 'agenda.mes', 'Agenda'), ('graficos', 'tablero.graficos_vista', 'Gráficos')] %}
           {% if puede_ver_vista(current_user, vista) %}
           <li class="nav-item"><a class="nav-link {{ 'active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}">{{ texto }}</a></li>
           {% endif %}

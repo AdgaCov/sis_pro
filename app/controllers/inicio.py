@@ -11,6 +11,8 @@ ENLACES = {
     "alertas": ("tablero.alertas", "Alertas", "Lo que requiere atención"),
     "informe": ("tablero.informe", "Informe crítico", "Tareas críticas y su línea de solución"),
     "cronograma": ("tablero.cronograma", "Cronograma", "Plazos y subtareas en el tiempo"),
+    "agenda": ("agenda.mes", "Agenda Despacho", "Fechas límite y recordatorios del mes"),
+    "graficos": ("tablero.graficos_vista", "Gráficos", "El estado de todo de un vistazo"),
 }
 
 
