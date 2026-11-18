@@ -51,6 +51,9 @@ def nuevo():
             flash(str(e), "danger")
         else:
             flash(f"Usuario «{usuario.nombre_usuario}» creado con la contraseña indicada.", "success")
+            if usuario.es_invitado:
+                flash("Indique qué unidades verá este invitado en el resumen ejecutivo.", "info")
+                return redirect(url_for("admin_invitados.editar", usuario_id=usuario.id))
             return redirect(url_for(".lista"))
     return render_template("admin/usuarios/form.html", form=form, usuario=None)
 

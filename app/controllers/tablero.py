@@ -1,8 +1,10 @@
-from flask import Blueprint, abort, current_app, render_template
+from flask import Blueprint, abort, current_app, make_response, render_template
 from flask_login import current_user
 
 from app.controllers.tareas import formulario_filtros
-from app.services import permisos, resumen
+from app.extensions import db
+from app.services import auditoria, pdf, permisos, resumen
+from app.utils.fechas import a_local, ahora_utc, formato_fecha_hora
 
 bp = Blueprint("tablero", __name__, url_prefix="/tablero")
 
@@ -30,6 +32,43 @@ def resumen_ejecutivo():
     datos = resumen.resumen_ejecutivo(infos, permisos.unidades_visibles(current_user))
     detalle = resumen.filtrar(infos, filtro.data, solo_mre=True)
     return render_template("tablero/resumen.html", datos=datos, detalle=detalle, **ctx)
+
+
+def _texto_filtros(filtro) -> str:
+    """Descripción legible de los filtros aplicados al detalle."""
+    partes = []
+    for nombre in ("unidad_id", "tipo_id", "instancia_id", "area_id", "alerta"):
+        campo = filtro[nombre]
+        if campo.data:
+            etiqueta = next((l for v, l in campo.choices if v == campo.data), campo.data)
+            partes.append(f"{campo.label.text}: {etiqueta}")
+    if (filtro.texto.data or "").strip():
+        partes.append(f"Búsqueda: «{filtro.texto.data.strip()}»")
+    partes.append("incluye concluidas" if filtro.ver_concluidas.data else "solo abiertas")
+    return "Filtros del detalle: " + " · ".join(partes)
+
+
+@bp.route("/resumen.pdf")
+def resumen_pdf():
+    _exigir("resumen")
+    filtro = formulario_filtros()
+    infos = resumen.cargar(current_user)
+    unidades = permisos.unidades_visibles(current_user)
+    datos = resumen.resumen_ejecutivo(infos, unidades)
+    detalle = resumen.filtrar(infos, filtro.data, solo_mre=True)
+    alcance = "Unidades: " + (", ".join(u.sigla for u in unidades) or "ninguna")
+    ahora = ahora_utc()
+    generado = f"Generado el {formato_fecha_hora(ahora)} por {current_user.nombre_usuario}"
+    contenido = pdf.resumen_ejecutivo(datos, detalle, alcance, _texto_filtros(filtro), generado)
+
+    auditoria.registrar("descargar_pdf", current_user, "resumen", None, {"gestiones": len(detalle)})
+    db.session.commit()
+    nombre = f"Resumen_Ejecutivo_MRE_{a_local(ahora):%Y%m%d}.pdf"
+    resp = make_response(contenido)
+    resp.headers["Content-Type"] = "application/pdf"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/alertas")

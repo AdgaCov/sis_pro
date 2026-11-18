@@ -63,6 +63,7 @@ def _registrar_sesion(app: Flask) -> None:
 
 
 def _registrar_blueprints(app: Flask) -> None:
+    from app.controllers.admin.invitados import bp as admin_invitados_bp
     from app.controllers.admin.usuarios import bp as admin_usuarios_bp
     from app.controllers.auth import bp as auth_bp
     from app.controllers.inicio import bp as inicio_bp
@@ -73,6 +74,7 @@ def _registrar_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_bp)
     app.register_blueprint(inicio_bp)
     app.register_blueprint(admin_usuarios_bp)
+    app.register_blueprint(admin_invitados_bp)
     app.register_blueprint(tareas_bp)
     app.register_blueprint(responsables_bp)
     app.register_blueprint(tablero_bp)

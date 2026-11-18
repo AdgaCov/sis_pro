@@ -192,16 +192,19 @@ def test_admin_y_supervisor_ven_todo_en_el_tablero(como, tarea, rol, ruta):
     assert "UAF-001" in html and "UPT-001" in html
 
 
-@pytest.mark.parametrize("vista,ruta", VISTAS.items())
-def test_invitado_solo_vistas_permitidas(como, tarea, vista, ruta):
+@pytest.mark.parametrize("ruta", ["/tablero/alertas", "/tablero/informe", "/tablero/cronograma"])
+def test_invitado_no_ve_otras_vistas(como, ruta):
+    c, _ = como("invitado", permisos={"todas_unidades": True})
+    assert c.get(ruta).status_code == 403
+
+
+def test_invitado_ve_resumen_solo_de_sus_unidades(como, tarea):
     _datos_de_prueba(tarea)
-    sin, _ = como("invitado", permisos={"todas_unidades": True})
-    assert sin.get(ruta).status_code == 403
-    con, _ = como("invitado", permisos={"todas_unidades": False, f"ver_{vista}": True}, unidades_invitado=["UPT"])
-    html = con.get(ruta).get_data(as_text=True)
-    assert "UPT-001" in html and "UAF-001" not in html
-    # sin la vista «tareas» no hay enlaces al detalle
-    assert "/tareas/" not in html
+    c, _ = como("invitado", unidades_invitado=["UPT"])
+    html = c.get("/tablero/resumen").get_data(as_text=True)
+    assert "UPT-001" in html and "UAF-001" not in html and "Asunto UAF" not in html
+    assert "/tareas/" not in html  # sin enlaces al detalle
+    assert c.get("/").headers["Location"].endswith("/tablero/resumen")
 
 
 def test_inicio_muestra_indicadores_y_enlaces(como, tarea):

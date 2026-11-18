@@ -5,6 +5,7 @@ Ningún controlador debe hacer `Tarea.query` directamente: siempre `consulta_tar
 from sqlalchemy import false
 
 from app.models import Tarea, Unidad, Usuario
+from app.models.permiso_invitado import VISTA_INVITADO
 
 
 def ids_unidades_visibles(usuario: Usuario) -> list[int] | None:
@@ -74,13 +75,11 @@ def puede_ver_vista(usuario: Usuario, vista: str) -> bool:
     if not usuario or not usuario.is_authenticated or not usuario.activo:
         return False
     if usuario.es_invitado:
-        return usuario.permiso_invitado is not None and usuario.permiso_invitado.permite_vista(vista)
+        return vista == VISTA_INVITADO
     return True
 
 
 def puede_ver_adjuntos(usuario: Usuario, tarea: Tarea) -> bool:
     if not puede_ver_tarea(usuario, tarea):
         return False
-    if usuario.es_invitado:
-        return bool(usuario.permiso_invitado and usuario.permiso_invitado.ver_adjuntos)
-    return True
+    return not usuario.es_invitado  # el invitado no ve tareas sueltas ni sus archivos

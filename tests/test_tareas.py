@@ -117,25 +117,16 @@ def test_supervisor_edita_cualquier_unidad(como, hacer_tarea):
                                   "/tareas/{id}/adjuntos/1/quitar"])
 def test_invitado_no_escribe_en_tareas(como, hacer_tarea, ruta):
     t = hacer_tarea("UAF")
-    c, _ = como("invitado", permisos={"todas_unidades": True, "ver_tareas": True, "ver_adjuntos": True})
+    c, _ = como("invitado", permisos={"todas_unidades": True})
     assert c.post(ruta.format(id=t.id), data=form()).status_code == 403
     assert Tarea.query.count() == 1
 
 
-def test_invitado_sin_vista_tareas(como, hacer_tarea):
+def test_invitado_no_entra_a_tareas(como, hacer_tarea):
     t = hacer_tarea("UAF")
     c, _ = como("invitado", permisos={"todas_unidades": True})
-    assert c.get("/tareas").status_code == 403
-    assert c.get(f"/tareas/{t.id}").status_code == 403
-
-
-def test_invitado_lee_solo_unidades_permitidas(como, hacer_tarea):
-    propia, ajena = hacer_tarea("UAF"), hacer_tarea("UPT")
-    c, _ = como("invitado", permisos={"ver_tareas": True}, unidades_invitado=["UAF"])
-    assert c.get(f"/tareas/{propia.id}").status_code == 200
-    assert c.get(f"/tareas/{ajena.id}").status_code == 404
-    html = c.get(f"/tareas/{propia.id}").data
-    assert b"/editar" not in html and b"Eliminar" not in html
+    for ruta in ["/tareas", f"/tareas/{t.id}", f"/tareas/{t.id}/editar", "/tareas/nueva"]:
+        assert c.get(ruta).status_code == 403, ruta
 
 
 def test_unidad_sin_unidad_no_crea(como):
@@ -298,14 +289,13 @@ def test_adjunto_de_otra_unidad_no_se_descarga(como, hacer_tarea):
     assert subir(otro, t).status_code == 404
 
 
-@pytest.mark.parametrize("ver_adjuntos,esperado", [(False, 403), (True, 200)])
-def test_invitado_descarga_adjuntos_segun_permiso(como, hacer_tarea, ver_adjuntos, esperado):
+def test_invitado_no_descarga_adjuntos(como, hacer_tarea):
     t = hacer_tarea("UAF")
     c, _ = como("unidad", "UAF")
     subir(c, t)
     adj = db.session.get(Tarea, t.id).adjuntos[0]
-    inv, _ = como("invitado", permisos={"todas_unidades": True, "ver_tareas": True, "ver_adjuntos": ver_adjuntos})
-    assert inv.get(f"/tareas/{t.id}/adjuntos/{adj.id}").status_code == esperado
+    inv, _ = como("invitado", permisos={"todas_unidades": True})
+    assert inv.get(f"/tareas/{t.id}/adjuntos/{adj.id}").status_code == 403
 
 
 # ------------------------------------------------------------------ pantallas

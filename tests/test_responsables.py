@@ -73,6 +73,6 @@ def test_admin_mueve_cargo(como):
 
 
 def test_invitado_no_entra_a_responsables(como):
-    c, _ = como("invitado", permisos={"todas_unidades": True, "ver_tareas": True})
+    c, _ = como("invitado", permisos={"todas_unidades": True})
     assert c.get("/responsables").status_code == 403
     assert c.post("/responsables/nuevo", data={"nombre": "X"}).status_code == 403

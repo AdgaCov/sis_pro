@@ -9,6 +9,7 @@ Es la migración de una app en Google Apps Script (ver `referencias/`) a Python.
 - Flask-SQLAlchemy, Flask-Migrate (Alembic), PyMySQL → MariaDB 10.6+
 - Flask-Login (sesiones), Flask-WTF (formularios + CSRF), python-dotenv
 - Jinja2 + Bootstrap 5 (sin frameworks JS; JS mínimo en `static/js/`)
+- `reportlab` para el PDF del resumen ejecutivo (no requiere LibreOffice)
 - Plantillas: `docxtpl` (Word) y `openpyxl` (Excel); PDF con LibreOffice headless
 - Tests: pytest
 
@@ -49,7 +50,7 @@ Cada persona tiene su propio usuario y contraseña, ligado a una unidad (salvo a
 | `admin` (Planificación) | Todo | Todo: tareas de cualquier unidad, reasignar tareas, mover cargos, usuarios, invitados, plantillas, catálogos |
 | `supervisor` (DGE) | Todo | Editar tareas de cualquier unidad y reasignarlas. No administra usuarios ni plantillas |
 | `unidad` | Solo su unidad | Crear/editar/eliminar sus tareas, adjuntos, subtareas y cargos de su unidad |
-| `invitado` | Lo que el admin configure | Solo leer y descargar PDF. Nunca modifica nada |
+| `invitado` | Solo el resumen ejecutivo, de las unidades que el admin configure | Leerlo y descargarlo en PDF. Nunca modifica nada |
 
 - **Contraseñas:** hash con `werkzeug.security`. Mínimo 8 caracteres con letras y números.
 - **Crear usuario:** el admin escribe la contraseña inicial (con confirmación). Opcionalmente marca «pedir cambio al primer ingreso» (`debe_cambiar_clave`); por defecto no.
@@ -59,10 +60,10 @@ Cada persona tiene su propio usuario y contraseña, ligado a una unidad (salvo a
 - Siempre debe existir al menos un admin activo.
 
 ### Invitado
-Tabla `permiso_invitado` por usuario invitado:
-- vistas permitidas: `resumen`, `alertas`, `informe`, `cronograma`, `tareas`
-- unidades permitidas (todas o una lista)
-- `ver_adjuntos` (sí/no)
+Solo ve el **resumen ejecutivo** (`/tablero/resumen`) y lo descarga en PDF (`/tablero/resumen.pdf`).
+No ve tareas, alertas, informe, cronograma, responsables ni adjuntos.
+Tabla `permiso_invitado` por usuario invitado: unidades permitidas (`todas_unidades` o una lista).
+Se configura en Admin › Invitados.
 
 `@solo_lectura` rechaza con 403 cualquier POST/PUT/PATCH/DELETE de un invitado (excepto logout y cambiar su propia clave).
 `services/permisos.py` filtra las consultas: ningún controlador consulta tareas sin pasar por ahí.
@@ -100,7 +101,7 @@ El admin sube `.docx` o `.xlsx` a `storage/plantillas/` e indica su **alcance**:
 - Excel: `openpyxl`, reemplaza `{{ marcador }}` en celdas; una fila con marcadores `{{ t.xxx }}` se repite por cada tarea conservando el formato.
 - Salida: el mismo formato o PDF (LibreOffice `soffice --headless --convert-to pdf`, con tiempo límite).
 - Al subir: validar marcadores contra el catálogo `marcador` y listar los desconocidos. Botón «Probar» con datos de ejemplo.
-- El invitado solo puede descargar en PDF y solo con datos que tiene permitido ver.
+- El invitado solo descarga el PDF del resumen ejecutivo, con datos de sus unidades.
 
 Marcadores base: `unidad.nombre`, `tarea.codigo`, `tarea.asunto`, `tarea.tipo`, `tarea.instancia`, `tarea.estado`, `tarea.prioridad`, `tarea.alerta`, `tarea.fecha_solicitud`, `tarea.fecha_limite`, `tarea.responsable`, `tarea.persona`, `tarea.hoja_ruta`, `tarea.resultado`, `tarea.solucion`, `resumen.total`, `resumen.pendientes`, `resumen.vencidas`, `generado.fecha`, `generado.por`.
 

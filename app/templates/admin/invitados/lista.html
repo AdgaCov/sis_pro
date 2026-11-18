@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}Invitados{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Invitados</h1>
+<p class="text-muted">Los invitados solo ven el <b>resumen ejecutivo</b> y lo descargan en PDF, con los datos de las unidades
+  que se les asignen aquí. No pueden modificar nada. Para crear un invitado use
+  <a href="{{ url_for('admin_usuarios.nuevo') }}">Usuarios › Nuevo usuario</a> con el rol «Invitado».</p>
+
+<div class="table-responsive">
+<table class="table table-sm align-middle bg-white">
+  <thead class="table-light"><tr><th>Usuario</th><th>Nombre</th><th>Estado</th><th>Unidades que ve</th><th></th></tr></thead>
+  <tbody>
+  {% for u in invitados %}
+    {% set p = u.permiso_invitado %}
+    <tr class="{{ '' if u.activo else 'text-muted' }}">
+      <td class="font-monospace">{{ u.nombre_usuario }}</td>
+      <td>{{ u.nombre_completo }}</td>
+      <td>{% if u.activo %}<span class="badge text-bg-success">Activo</span>{% else %}<span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+      <td>
+        {% if p and p.todas_unidades %}<span class="badge text-bg-primary">Todas</span>
+        {% elif p and p.unidades %}{% for un in p.unidades|sort(attribute='sigla') %}<span class="badge text-bg-light border">{{ un.sigla }}</span> {% endfor %}
+        {% else %}<span class="text-danger small">Ninguna: no verá datos</span>{% endif %}
+      </td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_invitados.editar', usuario_id=u.id) }}">Configurar</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-muted">No hay invitados.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

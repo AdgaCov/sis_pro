@@ -80,7 +80,7 @@ def test_invitado_recibe_permisos_vacios_y_se_quitan_al_cambiar_rol(app, hacer_u
     admin = hacer_usuario("admin")
     inv, _ = srv.crear_usuario("visita", "Visita", "invitado", None, admin)
     p = inv.permiso_invitado
-    assert p is not None and not any([p.ver_resumen, p.ver_tareas, p.todas_unidades, p.ver_adjuntos])
+    assert p is not None and not p.todas_unidades and p.unidades == []
     srv.actualizar_usuario(inv, "Visita", "supervisor", None, admin)
     assert inv.permiso_invitado is None
 

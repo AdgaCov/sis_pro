@@ -123,3 +123,7 @@ body { background: var(--fondo); color: var(--texto); }
   section { break-inside: avoid-page; }
   a { color: inherit; text-decoration: none; }
 }
+
+.lista-checks ul { list-style: none; padding-left: 0; margin: 0; }
+.lista-checks li { display: flex; gap: .5rem; align-items: center; padding: .15rem 0; }
+fieldset:disabled .lista-checks { opacity: .5; }

@@ -58,7 +58,7 @@ def rutas_escritura(app):
 @pytest.mark.parametrize("ruta", ["/_prueba/sin", "/_prueba/con"])
 @pytest.mark.parametrize("metodo", ["post", "put", "patch", "delete"])
 def test_invitado_no_puede_escribir(rutas_escritura, como, ruta, metodo):
-    c, _ = como("invitado", permisos={"todas_unidades": True, "ver_tareas": True})
+    c, _ = como("invitado", permisos={"todas_unidades": True})
     assert getattr(c, metodo)(ruta).status_code == 403
     assert c.get(ruta).status_code == 200
 
@@ -137,17 +137,20 @@ def test_unidad_sin_unidad_no_ve_nada(hacer_usuario, tareas):
     assert _codigos(u) == []
 
 
-def test_invitado_por_defecto_no_ve_nada(hacer_usuario, tareas):
+def test_invitado_por_defecto_no_ve_ninguna_unidad(hacer_usuario, tareas):
     inv = hacer_usuario("invitado")
     assert _codigos(inv) == []
-    assert not any(permisos.puede_ver_vista(inv, v) for v in ["resumen", "alertas", "informe", "cronograma", "tareas"])
+
+
+def test_invitado_solo_ve_el_resumen(hacer_usuario):
+    inv = hacer_usuario("invitado", permisos={"todas_unidades": True})
+    assert permisos.puede_ver_vista(inv, "resumen")
+    assert not any(permisos.puede_ver_vista(inv, v) for v in ["alertas", "informe", "cronograma", "tareas"])
 
 
 def test_invitado_ve_solo_unidades_permitidas(hacer_usuario, tareas):
-    inv = hacer_usuario("invitado", permisos={"ver_tareas": True}, unidades_invitado=["UPT", "UEP"])
+    inv = hacer_usuario("invitado", unidades_invitado=["UPT", "UEP"])
     assert _codigos(inv) == ["UEP-001", "UPT-001"]
-    assert permisos.puede_ver_vista(inv, "tareas")
-    assert not permisos.puede_ver_vista(inv, "informe")
 
 
 def test_invitado_todas_las_unidades_pero_nunca_edita(hacer_usuario, tareas):
@@ -157,14 +160,10 @@ def test_invitado_todas_las_unidades_pero_nunca_edita(hacer_usuario, tareas):
     assert not permisos.puede_reasignar(inv)
 
 
-def test_invitado_adjuntos_segun_permiso(hacer_usuario, tareas):
-    sin = hacer_usuario("invitado", permisos={"todas_unidades": True})
-    con = hacer_usuario("invitado", permisos={"todas_unidades": True, "ver_adjuntos": True})
-    solo_upt = hacer_usuario("invitado", permisos={"ver_adjuntos": True}, unidades_invitado=["UPT"])
-    assert not permisos.puede_ver_adjuntos(sin, tareas["UAF"])
-    assert permisos.puede_ver_adjuntos(con, tareas["UAF"])
-    assert not permisos.puede_ver_adjuntos(solo_upt, tareas["UAF"])  # no ve la unidad
-    assert permisos.puede_ver_adjuntos(solo_upt, tareas["UPT"])
+def test_invitado_nunca_ve_adjuntos(hacer_usuario, tareas):
+    inv = hacer_usuario("invitado", permisos={"todas_unidades": True})
+    assert not permisos.puede_ver_adjuntos(inv, tareas["UAF"])
+    assert permisos.puede_ver_adjuntos(hacer_usuario("unidad", "UAF"), tareas["UAF"])
 
 
 def test_usuario_inactivo_no_ve_nada(hacer_usuario, tareas):

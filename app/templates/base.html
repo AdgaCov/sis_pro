@@ -19,7 +19,9 @@
     <div class="collapse navbar-collapse" id="menu">
       <ul class="navbar-nav me-auto">
         {% if not current_user.debe_cambiar_clave %}
+        {% if not current_user.es_invitado %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('inicio.index') }}">Inicio</a></li>
+        {% endif %}
         {% if puede_ver_vista(current_user, 'tareas') %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('tareas.lista') }}">Tareas</a></li>
         {% endif %}
@@ -34,6 +36,7 @@
         {% endif %}
         {% if current_user.es_admin %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_usuarios.lista') }}">Usuarios</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_invitados.lista') }}">Invitados</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('tareas.papelera') }}">Papelera</a></li>
         {% endif %}
         {% endif %}

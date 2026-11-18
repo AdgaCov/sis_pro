@@ -1,7 +1,6 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, redirect, render_template, url_for
 from flask_login import current_user
 
-from app.models.permiso_invitado import VISTAS_INVITADO
 from app.services import permisos, resumen
 
 bp = Blueprint("inicio", __name__)
@@ -17,8 +16,10 @@ ENLACES = {
 
 @bp.route("/")
 def index():
-    vistas = [v for v in VISTAS_INVITADO if permisos.puede_ver_vista(current_user, v)]
+    if current_user.es_invitado:
+        return redirect(url_for("tablero.resumen_ejecutivo"))
+    vistas = [v for v in ENLACES if permisos.puede_ver_vista(current_user, v)]
     unidades = permisos.unidades_visibles(current_user)
-    kpis = resumen.kpis_generales(resumen.cargar(current_user)) if vistas and unidades else []
+    kpis = resumen.kpis_generales(resumen.cargar(current_user)) if unidades else []
     return render_template("inicio.html", vistas=vistas, unidades=unidades, kpis=kpis,
                            enlaces=[ENLACES[v] for v in vistas])

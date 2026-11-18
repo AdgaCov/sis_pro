@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titulo %}Configurar invitado{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <h1 class="h4 mb-1">Configurar invitado <span class="font-monospace">{{ usuario.nombre_usuario }}</span></h1>
+    <p class="text-muted">{{ usuario.nombre_completo }} verá el resumen ejecutivo y podrá descargarlo en PDF,
+      solo con las gestiones de estas unidades.</p>
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="form-check mb-3">
+            {{ form.todas_unidades(class="form-check-input", id="todas") }}
+            {{ form.todas_unidades.label(class="form-check-label", for="todas") }}
+          </div>
+          <fieldset id="listaUnidades" class="mb-3">
+            <legend class="form-label fs-6">O solo estas unidades</legend>
+            <div class="lista-checks">{{ form.unidades() }}</div>
+          </fieldset>
+          {{ form.enviar(class="btn btn-primary") }}
+          <a class="btn btn-link" href="{{ url_for('admin_invitados.lista') }}">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/invitados.js') }}"></script>
+{% endblock %}
