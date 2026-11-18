@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Catálogos{% endblock %}
+{% block contenido %}
+<h1 class="h4 mb-1">Catálogos</h1>
+<p class="text-muted">Valores de las listas desplegables de las tareas. Renombrar un valor lo cambia en todas sus tareas.
+  Un valor desactivado deja de ofrecerse, pero las tareas que lo tienen lo conservan.
+  Los valores <span class="badge text-bg-warning">protegidos</span> los usa la aplicación (alertas, resumen) y no se pueden cambiar.</p>
+
+<ul class="nav nav-tabs mb-3">
+  {% for t in tipos %}
+  <li class="nav-item"><a class="nav-link {{ 'active' if t == tipo }}" href="{{ url_for('admin_catalogos.lista', tipo=t) }}">{{ nombres[t] }}</a></li>
+  {% endfor %}
+</ul>
+
+<form method="post" action="{{ url_for('admin_catalogos.agregar', tipo=tipo) }}" class="d-flex gap-2 mb-3">
+  {{ accion.hidden_tag() }}
+  <input class="form-control" type="text" name="valor" maxlength="200" required placeholder="Nuevo valor" aria-label="Nuevo valor">
+  <button class="btn btn-primary text-nowrap" type="submit">Agregar</button>
+</form>
+
+<div class="table-responsive">
+<table class="table table-sm align-middle bg-white">
+  <thead class="table-light"><tr><th style="width: 90px">Orden</th><th>Valor</th><th class="text-end">Tareas</th><th>Estado</th><th></th></tr></thead>
+  <tbody>
+  {% for c in valores %}
+    <tr class="{{ '' if c.activo else 'text-muted' }}">
+      <td class="text-nowrap">
+        {% set primero, ultimo = loop.first, loop.last %}
+        {% for dir, simbolo, titulo in [('subir', '↑', 'Subir'), ('bajar', '↓', 'Bajar')] %}
+        <form class="d-inline" method="post" action="{{ url_for('admin_catalogos.mover', catalogo_id=c.id) }}">
+          {{ accion.hidden_tag() }}<input type="hidden" name="direccion" value="{{ dir }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit" title="{{ titulo }}" aria-label="{{ titulo }} {{ c.valor }}"
+                  {{ 'disabled' if (dir == 'subir' and primero) or (dir == 'bajar' and ultimo) }}>{{ simbolo }}</button>
+        </form>
+        {% endfor %}
+      </td>
+      <td>
+        {% if c.protegido %}
+          {{ c.valor }} <span class="badge text-bg-warning">protegido</span>
+        {% else %}
+        <form method="post" action="{{ url_for('admin_catalogos.renombrar', catalogo_id=c.id) }}" class="d-flex gap-1">
+          {{ accion.hidden_tag() }}
+          <input class="form-control form-control-sm" type="text" name="valor" maxlength="200" required value="{{ c.valor }}" aria-label="Valor">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+        </form>
+        {% endif %}
+      </td>
+      <td class="text-end">{{ usos.get(c.id, 0) }}</td>
+      <td>{% if c.activo %}<span class="badge text-bg-success">Activo</span>{% else %}<span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+      <td class="text-end text-nowrap">
+        {% if not c.protegido %}
+        <form class="d-inline" method="post" action="{{ url_for('admin_catalogos.estado', catalogo_id=c.id) }}">
+          {{ accion.hidden_tag() }}<input type="hidden" name="activo" value="{{ '0' if c.activo else '1' }}">
+          <button class="btn btn-sm {{ 'btn-outline-warning' if c.activo else 'btn-outline-success' }}" type="submit">{{ 'Desactivar' if c.activo else 'Activar' }}</button>
+        </form>
+        {% if not usos.get(c.id) %}
+        <form class="d-inline" method="post" action="{{ url_for('admin_catalogos.eliminar', catalogo_id=c.id) }}"
+              data-confirmar="¿Eliminar «{{ c.valor }}»?">
+          {{ accion.hidden_tag() }}<button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-muted">Sin valores.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>{% endblock %}
