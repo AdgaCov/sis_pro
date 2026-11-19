@@ -2,7 +2,6 @@
 {% from "_macros.html" import kpis as indicadores, filtros, chip_alerta, enlace_tarea, menu_documentos %}
 {% macro url_doc(p, formato) %}{{ url_for('documentos.agenda_mes', plantilla_id=p.id, formato=formato, mes=mes.strftime('%Y-%m'), **args) }}{% endmacro %}
 {% block titulo %}Agenda Despacho{% endblock %}
-{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% macro evento(e) %}
   {% set t = e.info.t %}
   <div class="ag-ev c-borde-{{ e.clase }} {{ 'hecho' if e.hecho }}"

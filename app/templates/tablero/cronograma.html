@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import filtros, enlace_tarea %}
 {% block titulo %}Cronograma{% endblock %}
-{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% macro lineas() %}{% for m in datos.meses %}<div class="g-linea" style="left: {{ m.pct }}%"></div>{% endfor %}<div class="g-hoy" style="left: {{ datos.hoy }}%"></div>{% endmacro %}
 {% block contenido %}
 <h1 class="h4 mb-1">Cronograma</h1>

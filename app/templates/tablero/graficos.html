@@ -2,7 +2,6 @@
 {% from "_macros.html" import filtros, menu_documentos %}
 {% macro url_doc(p, formato) %}{{ url_for('documentos.graficos', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
 {% block titulo %}Gráficos{% endblock %}
-{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
   <div>
