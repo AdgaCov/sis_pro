@@ -9,3 +9,5 @@ storage/respaldos/*
 storage/generados/*
 storage/plantillas/*
 !storage/**/.gitkeep
+uv.lock
+.python-version
