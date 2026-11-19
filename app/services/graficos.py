@@ -25,7 +25,7 @@ def _en_mes(d: date | None, mes: date) -> bool:
     return d is not None and d.year == mes.year and d.month == mes.month
 
 
-def _cumplimiento(infos) -> tuple[int | None, int]:
+def cumplimiento_de(infos) -> tuple[int | None, int]:
     """% de concluidas con fecha límite que se cerraron a tiempo. (None si no hay base)."""
     base = [i for i in infos if i.concluida and i.t.fecha_limite and i.t.fecha_conclusion]
     if not base:
@@ -38,6 +38,12 @@ def _sin_respuesta(i) -> bool:
     return "sin respuesta" in (i.t.estado.valor if i.t.estado else "").lower()
 
 
+def _filtro_sin_respuesta() -> dict | None:
+    """Filtro de la lista para la tarjeta «Sin respuesta del MRE» (solo si un único estado lo representa)."""
+    ids = [c.id for c in Catalogo.query.filter_by(tipo="estado") if "sin respuesta" in c.valor.lower()]
+    return {"estado_id": ids[0]} if len(ids) == 1 else None
+
+
 def datos(infos: list[al.InfoTarea], unidades, por_unidad: bool, meta: int, hoy: date | None = None) -> dict:
     """Todo lo que dibuja la vista Gráficos (y su PDF). Solo tipos simples: se envía como JSON."""
     hoy = hoy or hoy_local()
@@ -48,14 +54,15 @@ def datos(infos: list[al.InfoTarea], unidades, por_unidad: bool, meta: int, hoy:
     variacion = round((concl_mes - concl_ant) * 100 / concl_ant) if concl_ant else None
 
     tarjetas = [
-        {"clave": "pendientes", "titulo": "Pendientes", "valor": len(abiertas), "alerta": False},
+        # filtro vacío: la lista ya muestra solo las abiertas por defecto
+        {"clave": "pendientes", "titulo": "Pendientes", "valor": len(abiertas), "alerta": False, "filtro": {}},
         {"clave": "vencidas", "titulo": "Vencidas", "valor": sum(1 for i in abiertas if i.alerta == al.VENCIDO),
          "alerta": True, "filtro": {"alerta": al.VENCIDO}},
         {"clave": "por_vencer", "titulo": "Por vencer",
          "valor": sum(1 for i in abiertas if i.alerta == al.POR_VENCER), "alerta": True,
          "filtro": {"alerta": al.POR_VENCER}},
         {"clave": "sin_respuesta", "titulo": "Sin respuesta del MRE",
-         "valor": sum(1 for i in abiertas if _sin_respuesta(i)), "alerta": True},
+         "valor": sum(1 for i in abiertas if _sin_respuesta(i)), "alerta": True, "filtro": _filtro_sin_respuesta()},
         {"clave": "concluidas_mes", "titulo": "Concluidas este mes", "valor": concl_mes, "alerta": False,
          "variacion": variacion},
     ]
@@ -89,11 +96,11 @@ def datos(infos: list[al.InfoTarea], unidades, por_unidad: bool, meta: int, hoy:
             x["valor"] += 1
     instancias = sorted(por_instancia.values(), key=lambda x: (-x["valor"], x["nombre"]))[:8]
 
-    pct, base = _cumplimiento(infos)
+    pct, base = cumplimiento_de(infos)
     anillos = []
     if por_unidad:
         for u in unidades:
-            p, n = _cumplimiento([i for i in infos if i.t.unidad_id == u.id])
+            p, n = cumplimiento_de([i for i in infos if i.t.unidad_id == u.id])
             anillos.append({"sigla": u.sigla, "unidad_id": u.id, "pct": p, "base": n})
 
     return {

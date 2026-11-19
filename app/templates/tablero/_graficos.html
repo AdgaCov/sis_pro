@@ -1,0 +1,145 @@
+{# Bloques del tablero gráfico. Lo incluyen el inicio y /tablero/graficos.
+   Necesita: datos, por_unidad, proximos, calendario, titulo_mes, dias_semana, filtro, ver_tareas. #}
+{% from "_macros.html" import chip_alerta, enlace_tarea %}
+{# 1. ¿Cómo estamos hoy? #}
+<div class="kpis mb-3">
+  {% for k in datos.tarjetas %}
+  {% set url = url_for('tareas.lista', unidad_id=filtro.unidad_id.data or None, **k.filtro) if ver_tareas and k.filtro is defined and k.filtro is not none else None %}
+  <{{ 'a' if url else 'div' }} class="kpi {{ 'alerta' if k.alerta and k.valor }} {{ 'kpi-enlace' if url }}" {% if url %}href="{{ url }}"{% endif %}>
+    <span>{{ k.titulo }}</span><b>{{ k.valor }}</b>
+    {% if k.variacion is defined and k.variacion is not none %}
+      <small class="{{ 'text-success' if k.variacion >= 0 else 'text-danger' }}">{{ '+' if k.variacion > 0 }}{{ k.variacion }} % vs. mes anterior</small>
+    {% elif k.clave == 'concluidas_mes' %}<small class="text-muted">sin datos del mes anterior</small>{% endif %}
+  </{{ 'a' if url else 'div' }}>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  {# 2. ¿Qué unidad está más atrasada? / Mis próximos vencimientos #}
+  <div class="col-lg-8">
+    <div class="card h-100"><div class="card-body">
+      {% if por_unidad %}
+        <h2 class="h6 seccion-titulo">Pendientes por unidad</h2>
+        <p class="marca-sm mb-2">¿Qué unidad está más atrasada? Cada barra, dividida por alerta.</p>
+        <div class="grafico" style="height: 300px"><canvas id="gUnidades" aria-label="Pendientes por unidad, por alerta" role="img"></canvas></div>
+      {% else %}
+        <h2 class="h6 seccion-titulo">Próximos vencimientos</h2>
+        <p class="marca-sm mb-2">Tareas abiertas con fecha límite, de la más urgente a la más lejana.</p>
+        <ul class="list-group list-group-flush">
+        {% for i in proximos %}
+          <li class="list-group-item d-flex flex-wrap gap-2 align-items-center px-0">
+            {{ chip_alerta(i.alerta) }} <b class="font-monospace">{{ enlace_tarea(i.t, ver_tareas) }}</b>
+            <span>{{ i.t.asunto|truncate(70) }}</span>
+            <span class="ms-auto small text-nowrap">{{ i.t.fecha_limite|fecha }}</span>
+          </li>
+        {% else %}<li class="list-group-item text-muted px-0">Sin fechas límite pendientes.</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div></div>
+  </div>
+
+  {# 3. ¿Cumplimos los plazos? #}
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6 seccion-titulo">Cumplimiento de plazos</h2>
+      <p class="marca-sm mb-2">Concluidas antes de su fecha límite. Meta: {{ datos.cumplimiento.meta }} %.</p>
+      {% if datos.cumplimiento.pct is not none %}
+        <div class="grafico" style="height: 170px"><canvas id="gCumplimiento" aria-label="Cumplimiento {{ datos.cumplimiento.pct }} %" role="img"></canvas></div>
+        <p class="text-center mb-0"><b class="fs-3 {{ 'text-success' if datos.cumplimiento.pct >= datos.cumplimiento.meta else 'text-danger' }}">{{ datos.cumplimiento.pct }} %</b>
+          <br><span class="marca-sm">de {{ datos.cumplimiento.base }} tareas concluidas con fecha límite</span></p>
+      {% else %}
+        <p class="text-muted">Aún no hay tareas concluidas con fecha límite.</p>
+      {% endif %}
+    </div></div>
+  </div>
+
+  {# 4. ¿Entra más trabajo del que cerramos? #}
+  <div class="col-lg-8">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6 seccion-titulo">Creadas contra concluidas</h2>
+      <p class="marca-sm mb-2">¿Entra más trabajo del que cerramos? Últimos 12 meses.</p>
+      <div class="grafico" style="height: 260px"><canvas id="gMensual" aria-label="Tareas creadas y concluidas por mes" role="img"></canvas></div>
+    </div></div>
+  </div>
+
+  {# 5. ¿Dónde se traban los trámites? #}
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6 seccion-titulo">Embudo de estados</h2>
+      <p class="marca-sm mb-2">¿Dónde se traban los trámites? Tareas abiertas por estado.</p>
+      {% if datos.embudo %}
+        <div class="grafico" style="height: {{ 60 + 28 * datos.embudo|length }}px"><canvas id="gEmbudo" aria-label="Tareas abiertas por estado" role="img"></canvas></div>
+      {% else %}<p class="text-muted">Sin tareas abiertas.</p>{% endif %}
+    </div></div>
+  </div>
+
+  {# 6. ¿Qué vence este mes? #}
+  <div class="col-lg-7">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-baseline">
+        <h2 class="h6 seccion-titulo">Vencimientos de {{ titulo_mes }}</h2>
+        <a class="small" href="{{ url_for('agenda.mes', unidad_id=filtro.unidad_id.data or None) }}">Abrir agenda</a>
+      </div>
+      <p class="marca-sm mb-2">Cada día con el color de su peor alerta.</p>
+      <table class="table table-bordered table-sm mini-calendario mb-0">
+        <thead><tr>{% for d in dias_semana %}<th class="text-center">{{ d }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for semana in calendario %}<tr>
+          {% for dia in semana %}
+          <td class="{{ 'fuera' if not dia.en_mes }} {{ 'es-hoy' if dia.hoy }} {{ ('dia-' ~ dia.peor) if dia.peor }}"
+              title="{% for e in dia.eventos %}{{ e.info.t.codigo }} · {{ e.texto|truncate(50) }}&#10;{% endfor %}">
+            {{ dia.fecha.day }}{% if dia.eventos %}<span class="mini-n">{{ dia.eventos|length }}</span>{% endif %}
+          </td>
+          {% endfor %}
+        </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+
+  {# 7. ¿A quién hay que insistir? #}
+  <div class="col-lg-5">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6 seccion-titulo">Instancias del MRE con más pendientes</h2>
+      <p class="marca-sm mb-2">¿A quién hay que insistir?</p>
+      {% set maximo = (datos.instancias|map(attribute='valor')|max) if datos.instancias else 1 %}
+      <ol class="list-unstyled mb-0">
+      {% for x in datos.instancias %}
+        <li class="mb-2">
+          <div class="d-flex justify-content-between small">
+            {% if ver_tareas %}<a href="{{ url_for('tareas.lista', instancia_id=x.id, unidad_id=filtro.unidad_id.data or None) }}">{{ x.nombre }}</a>
+            {% else %}<span>{{ x.nombre }}</span>{% endif %}
+            <b>{{ x.valor }}</b>
+          </div>
+          <div class="barra-lista"><span style="width: {{ (x.valor * 100 / maximo)|round(1) }}%"></span></div>
+        </li>
+      {% else %}<li class="text-muted">Sin gestiones pendientes con el MRE.</li>{% endfor %}
+      </ol>
+    </div></div>
+  </div>
+
+  {# 8. Comparación rápida entre unidades #}
+  {% if por_unidad and datos.anillos %}
+  <div class="col-12">
+    <div class="card"><div class="card-body">
+      <h2 class="h6 seccion-titulo">Cumplimiento por unidad</h2>
+      <p class="marca-sm mb-2">Concluidas a tiempo, por unidad (meta {{ datos.cumplimiento.meta }} %).</p>
+      <div class="anillos">
+        {% for a in datos.anillos %}
+        <div class="anillo">
+          {% if a.pct is not none %}<canvas id="gAnillo{{ loop.index0 }}" width="110" height="110" aria-label="{{ a.sigla }} {{ a.pct }} %" role="img"></canvas>
+          {% else %}<div class="anillo-vacio">—</div>{% endif %}
+          <b>{{ a.sigla }}</b>
+          <span class="marca-sm">{{ (a.pct ~ ' %') if a.pct is not none else 'sin datos' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div></div>
+  </div>
+  {% endif %}
+</div>
+
+<script type="application/json" id="datosGraficos">{{ datos|tojson }}</script>
+<div id="configGraficos" hidden
+     data-tareas="{{ url_for('tareas.lista') if ver_tareas else '' }}"
+     data-unidad="{{ filtro.unidad_id.data or '' }}"></div>

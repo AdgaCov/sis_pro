@@ -68,7 +68,8 @@ def formulario_filtros() -> FiltroTareasForm:
 def texto_filtros(filtro) -> str:
     """Descripción legible de los filtros aplicados."""
     partes = []
-    for nombre in ("unidad_id", "tipo_id", "instancia_id", "area_id", "alerta"):
+    for nombre in ("unidad_id", "tipo_id", "estado_id", "prioridad_id", "instancia_id", "area_id",
+                   "responsable_id", "alerta"):
         campo = filtro[nombre]
         if campo.data:
             etiqueta = next((l for v, l in campo.choices if v == campo.data), campo.data)

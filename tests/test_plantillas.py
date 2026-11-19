@@ -172,6 +172,17 @@ def test_ficha_de_tarea_en_word(como, admin, con_tareas):
     assert Auditoria.query.filter_by(accion="generar_documento").count() == 1
 
 
+def test_error_de_ejecucion_en_plantilla_no_rompe(como, admin, con_tareas):
+    """Un marcador que falla al evaluarse (sumar texto y número) avisa al usuario en vez de dar error 500."""
+    subir(admin, word("{{ tarea.codigo + 1 }}"), "ficha.docx")
+    p = Plantilla.query.one()
+    a, _ = con_tareas
+    c, _ = como("unidad", "UAF")
+    r = c.get(f"/documentos/{p.id}/tarea/{a.id}")
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/tareas/{a.id}")
+    assert "revise sus marcadores" in c.get(r.headers["Location"]).get_data(as_text=True)
+
+
 def test_ficha_de_tarea_ajena_no(como, admin, con_tareas):
     subir(admin, word("{{ tarea.codigo }}"), "ficha.docx")
     p = Plantilla.query.one()
@@ -294,3 +305,154 @@ def test_pdf_tiempo_limite(admin, con_tareas, app, monkeypatch, tmp_path):
     with pytest.raises(ErrorNegocio, match="tardó demasiado"):
         pdf.convertir_a_pdf(word("x"), "docx")
     assert list((app.config["STORAGE_DIR"] / "generados").iterdir()) == []
+
+
+# ------------------------------------------------------------------ resumen, agenda y gráficos
+def word_con_tabla(parrafos, lista, celdas) -> bytes:
+    """Word con párrafos y una tabla cuya fila se repite por cada elemento de `lista`."""
+    d = docx.Document()
+    for p in parrafos:
+        d.add_paragraph(p)
+    t = d.add_table(rows=3, cols=len(celdas))
+    var = celdas[0].split("{{ ")[1].split(".")[0]
+    t.cell(0, 0).text = f"{{%tr for {var} in {lista} %}}"
+    for k, c in enumerate(celdas):
+        t.cell(1, k).text = c
+    t.cell(2, 0).text = "{%tr endfor %}"
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()
+
+
+def excel_filas(*filas) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    for fila in filas:
+        ws.append(list(fila))
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def imagenes_en(datos: bytes) -> list[str]:
+    import zipfile
+    return [n for n in zipfile.ZipFile(io.BytesIO(datos)).namelist() if n.startswith("word/media/")]
+
+
+def test_resumen_ejecutivo_en_word(admin, con_tareas):
+    subir(admin, word_con_tabla(["Gestiones: {{ indicadores.total_mre }} · vencidas {{ indicadores.vencidas }}"],
+                                "por_unidad", ["{{ u.sigla }}", "{{ u.pendientes }}", "{{ u.vencidas }}"]),
+          "resumen.docx", alcance="resumen")
+    p = Plantilla.query.one()
+    assert p.marcadores_desconocidos == []
+    r = admin.get(f"/documentos/{p.id}/resumen")
+    assert r.status_code == 200 and r.headers["Content-Disposition"].endswith('.docx')
+    texto = texto_word(r.data)
+    assert "Gestiones: 3 · vencidas 1" in texto
+    assert "UAF" in texto and "UPT" in texto and "SISTEMAS" in texto
+    # el menú aparece en la vista
+    assert f"/documentos/{p.id}/resumen" in admin.get("/tablero/resumen").get_data(as_text=True)
+
+
+def test_resumen_en_excel_repite_unidades_e_instancias(como, admin, con_tareas):
+    a, _ = con_tareas
+    a.instancia_id = Catalogo.query.filter_by(tipo="instancia").first().id
+    db.session.commit()
+    subir(admin, excel_filas(("{{ unidad.nombre }}",), ("{{ u.sigla }}", "{{ u.total }}"), ("Instancias",),
+                             ("{{ i.nombre }}", "{{ i.pendientes }}"), ("{{ t.codigo }}", "{{ t.asunto }}")),
+          "resumen.xlsx", alcance="resumen")
+    p = Plantilla.query.one()
+    assert p.marcadores_desconocidos == []
+    c, _ = como("unidad", "UAF")
+    ws = load_workbook(io.BytesIO(c.get(f"/documentos/{p.id}/resumen").data)).active
+    valores = [[x.value for x in fila] for fila in ws.iter_rows()]
+    assert valores[0][0] == "UAF - Unidad Administrativa Financiera"
+    assert valores[1][:2] == ["UAF", 2]  # la unidad solo ve su unidad; total como número
+    assert valores[2][0] == "Instancias"
+    instancia = Catalogo.query.get(a.instancia_id).valor
+    assert sorted(v[0] for v in valores[3:5]) == sorted([instancia, "Sin instancia"])  # como en la vista
+    assert [v[0] for v in valores[5:7]] == ["UAF-001", "UAF-002"]
+    assert "UPT" not in str(valores)
+
+
+def test_agenda_en_excel_con_eventos_del_mes(admin, con_tareas):
+    a, _ = con_tareas
+    subir(admin, excel_filas(("Agenda {{ mes.nombre }}", "{{ indicadores.fechas_limite }}"),
+                             ("{{ e.fecha }}", "{{ e.codigo }}", "{{ e.tipo }}", "{{ e.alerta }}")),
+          "agenda.xlsx", alcance="agenda")
+    p = Plantilla.query.one()
+    assert p.marcadores_desconocidos == []
+    mes = f"{a.fecha_limite:%Y-%m}"
+    r = admin.get(f"/documentos/{p.id}/agenda?mes={mes}")
+    assert r.status_code == 200 and f"_{a.fecha_limite:%Y_%m}.xlsx" in r.headers["Content-Disposition"]
+    ws = load_workbook(io.BytesIO(r.data)).active
+    assert ws["A1"].value.startswith("Agenda ") and ws["B1"].value == 1
+    assert [ws["B2"].value, ws["C2"].value, ws["D2"].value] == ["UAF-001", "Fecha límite", "VENCIDO"]
+
+
+def test_graficos_en_word_con_imagenes(admin, con_tareas):
+    subir(admin, word_con_tabla(
+        ["Pendientes {{ indicadores.pendientes }} · cumplimiento {{ cumplimiento.porcentaje }}",
+         "{{ imagen.barras }}", "{{ imagen.cumplimiento }}", "{{ imagen.mensual }}", "{{ imagen.embudo }}"],
+        "embudo", ["{{ f.estado }}", "{{ f.tareas }}"]), "tablero.docx", alcance="graficos")
+    p = Plantilla.query.one()
+    assert p.marcadores_desconocidos == []
+    r = admin.get(f"/documentos/{p.id}/graficos")
+    assert r.status_code == 200
+    assert "Pendientes 3" in texto_word(r.data) and "Pendiente" in texto_word(r.data)
+    assert len(imagenes_en(r.data)) == 4  # los cuatro gráficos como imágenes
+    for ruta in ("/", "/tablero/graficos"):
+        assert f"/documentos/{p.id}/graficos" in admin.get(ruta).get_data(as_text=True)
+
+
+def test_graficos_en_excel_por_unidad_y_mensual(admin, con_tareas):
+    subir(admin, excel_filas(("{{ u.sigla }}", "{{ u.vencido }}", "{{ u.pendientes }}"),
+                             ("{{ m.mes }}", "{{ m.creadas }}")), "tablero.xlsx", alcance="graficos")
+    p = Plantilla.query.one()
+    ws = load_workbook(io.BytesIO(admin.get(f"/documentos/{p.id}/graficos").data)).active
+    filas = [[x.value for x in fila] for fila in ws.iter_rows()]
+    assert filas[0] == ["DGE-STAF", 0, 0] and ["UAF", 1, 2] in filas and ["UPT", 0, 1] in filas
+    assert len(filas) == 6 + 12  # 6 unidades y 12 meses
+
+
+@pytest.mark.parametrize("alcance,ruta", [("resumen", "resumen"), ("agenda", "agenda"), ("graficos", "graficos")])
+def test_invitado_no_genera_documentos_del_tablero(como, admin, alcance, ruta):
+    subir(admin, word("{{ unidad.nombre }}"), "x.docx", alcance=alcance)
+    p = Plantilla.query.one()
+    c, _ = como("invitado", permisos={"todas_unidades": True})
+    assert c.get(f"/documentos/{p.id}/{ruta}").status_code == 403
+    vista = {"resumen": "/tablero/resumen", "agenda": "/agenda", "graficos": "/tablero/graficos"}[alcance]
+    assert f"/documentos/{p.id}/" not in c.get(vista).get_data(as_text=True)  # tampoco ve el menú
+
+
+def test_alcance_distinto_da_404(admin):
+    subir(admin, word("{{ unidad.nombre }}"), "x.docx", alcance="agenda")
+    p = Plantilla.query.one()
+    assert admin.get(f"/documentos/{p.id}/resumen").status_code == 404
+
+
+@pytest.mark.parametrize("alcance", ["resumen", "agenda", "graficos"])
+def test_probar_alcances_del_tablero(admin, alcance):
+    subir(admin, word("{{ mes.nombre }} {{ indicadores.pendientes }} {% for u in por_unidad %}{{ u.sigla }} {% endfor %}",
+                      "{{ imagen.barras }}"), "x.docx", alcance=alcance)
+    p = Plantilla.query.one()
+    r = admin.get(f"/admin/plantillas/{p.id}/probar")
+    assert r.status_code == 200
+    assert "Noviembre 2026 9 UAF UPT" in texto_word(r.data) and len(imagenes_en(r.data)) == 1
+
+
+def test_imagenes_png_aun_sin_datos():
+    from app.services import imagenes
+
+    vacio = {"barras": {"etiquetas": [], "unidades": [], "series": []},
+             "cumplimiento": {"pct": None, "base": 0, "meta": 80},
+             "mensual": {"etiquetas": ["ene 26"], "creadas": [0], "concluidas": [0]}, "embudo": []}
+    for png in imagenes.todas(vacio).values():
+        assert png.startswith(b"\x89PNG")
+
+
+def test_pagina_de_marcadores_agrupada(admin):
+    html = admin.get("/admin/plantillas/marcadores").get_data(as_text=True)
+    for texto in ("Resumen ejecutivo", "Agenda Despacho", "Tablero con gráficos", "fila_unidad.sigla",
+                  "imagen.barras", "evento.codigo"):
+        assert texto in html

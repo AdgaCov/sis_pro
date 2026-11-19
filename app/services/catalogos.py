@@ -113,6 +113,8 @@ def mover(actor: Usuario, c: Catalogo, direccion: int) -> None:
     lista[i], lista[j] = lista[j], lista[i]
     for orden, x in enumerate(lista, start=1):  # renumera para corregir órdenes repetidos
         x.orden = orden
+    auditoria.registrar("mover_catalogo", actor, "catalogo", c.id,
+                        {"tipo": c.tipo, "valor": c.valor, "posicion": j + 1})
     db.session.commit()
 
 

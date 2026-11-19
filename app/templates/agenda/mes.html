@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis as indicadores, filtros, chip_alerta, enlace_tarea %}
+{% from "_macros.html" import kpis as indicadores, filtros, chip_alerta, enlace_tarea, menu_documentos %}
+{% macro url_doc(p, formato) %}{{ url_for('documentos.agenda_mes', plantilla_id=p.id, formato=formato, mes=mes.strftime('%Y-%m'), **args) }}{% endmacro %}
 {% block titulo %}Agenda Despacho{% endblock %}
 {% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% macro evento(e) %}
   {% set t = e.info.t %}
-  <div class="ag-ev c-borde-{{ e.clase }} {{ 'hecho' if e.hecho }}" title="{{ t.codigo }} · {{ t.asunto }}&#10;{{ t.estado.valor }} · {{ e.alerta }}">
-    <b>{{ t.codigo }}</b> {{ '◆' if e.tipo == 'limite' else '•' }} {{ e.texto|truncate(40) }}
+  <div class="ag-ev c-borde-{{ e.clase }} {{ 'hecho' if e.hecho }}"
+       title="{{ t.codigo }} · {{ t.asunto }}{% if e.tipo != 'limite' %}&#10;Recordatorio: {{ e.texto }}{% endif %}&#10;{{ t.estado.valor }} · {{ e.alerta }}">
+    {{ '◆' if e.tipo == 'limite' else '•' }} <b>{{ t.codigo }}</b>
   </div>
 {% endmacro %}
 {% block contenido %}
@@ -15,37 +17,54 @@
     <p class="text-muted mb-2">Fechas límite de las tareas abiertas (◆) y recordatorios de sus subtareas (•).
       {% if solo_mre %}Solo gestiones con el MRE.{% endif %}</p>
   </div>
-  <a class="btn btn-primary btn-sm" href="{{ url_for('agenda.mes_pdf', mes=mes.strftime('%Y-%m'), **args) }}">Descargar PDF del mes</a>
+  <div class="text-nowrap">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('agenda.mes_pdf', mes=mes.strftime('%Y-%m'), **args) }}">Descargar PDF del mes</a>
+    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+  </div>
 </div>
 
 {{ filtros(filtro, ['unidad_id', 'responsable_id'], url_for('agenda.mes'), varias_unidades) }}
 
-<div class="d-flex align-items-center gap-2 mb-2">
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('agenda.mes', mes=anterior, **args) }}" aria-label="Mes anterior">&larr;</a>
   <h2 class="h5 mb-0 seccion-titulo" style="min-width: 12rem; text-align: center">{{ titulo }}</h2>
   <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('agenda.mes', mes=siguiente, **args) }}" aria-label="Mes siguiente">&rarr;</a>
   {% if mes.strftime('%Y-%m') != actual %}<a class="btn btn-sm btn-link" href="{{ url_for('agenda.mes', **args) }}">Hoy</a>{% endif %}
+  <span class="marca-sm ms-2">Se muestran el mes anterior, el elegido y el siguiente. Indicadores de {{ titulo }}.</span>
 </div>
 
 {{ indicadores(kpis) }}
 
-<div class="table-responsive mb-4">
-<table class="table table-bordered bg-white calendario mb-0">
-  <thead class="table-light"><tr>{% for d in dias_semana %}<th class="text-center small">{{ d }}</th>{% endfor %}</tr></thead>
-  <tbody>
-  {% for semana in semanas %}
-    <tr>
-    {% for dia in semana %}
-      <td class="{{ 'fuera' if not dia.en_mes }} {{ 'es-hoy' if dia.hoy }} {{ ('dia-' ~ dia.peor) if dia.peor }}">
-        <div class="ag-num">{{ dia.fecha.day }}</div>
-        {% for e in dia.eventos[:4] %}{{ evento(e) }}{% endfor %}
-        {% if dia.eventos|length > 4 %}<div class="marca-sm">+{{ dia.eventos|length - 4 }} más</div>{% endif %}
-      </td>
-    {% endfor %}
-    </tr>
+<div class="row g-3 mb-4">
+  {% for c in calendarios %}
+  <div class="col-xl-4">
+    <div class="card h-100 {{ 'mes-elegido' if c.elegido }}"><div class="card-body p-2">
+      <div class="d-flex justify-content-between align-items-baseline mb-1 px-1">
+        {% if c.elegido %}<h3 class="h6 mb-0 seccion-titulo">{{ c.titulo }}</h3>
+        {% else %}<h3 class="h6 mb-0"><a href="{{ url_for('agenda.mes', mes=c.clave, **args) }}">{{ c.titulo }}</a></h3>{% endif %}
+        <span class="marca-sm">{{ c.eventos }} evento{{ 's' if c.eventos != 1 }}</span>
+      </div>
+      <table class="table table-bordered bg-white calendario calendario-3 mb-0">
+        <thead class="table-light"><tr>{% for d in dias_semana %}<th class="text-center">{{ d }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for semana in c.semanas %}
+          <tr>
+          {% for dia in semana %}
+            {% if dia.en_mes %}
+            <td class="{{ 'es-hoy' if dia.hoy }} {{ ('dia-' ~ dia.peor) if dia.peor }}">
+              <div class="ag-num">{{ dia.fecha.day }}</div>
+              {% for e in dia.eventos[:3] %}{{ evento(e) }}{% endfor %}
+              {% if dia.eventos|length > 3 %}<div class="marca-sm" title="{% for e in dia.eventos[3:] %}{{ e.info.t.codigo }} · {{ e.texto|truncate(50) }}&#10;{% endfor %}">+{{ dia.eventos|length - 3 }} más</div>{% endif %}
+            </td>
+            {% else %}<td class="fuera"><div class="ag-num">{{ dia.fecha.day }}</div></td>{% endif %}
+          {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
   {% endfor %}
-  </tbody>
-</table>
 </div>
 
 <section>

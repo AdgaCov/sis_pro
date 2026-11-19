@@ -218,6 +218,8 @@ def test_marcar_subtarea(como):
     c.post(f"/tareas/{t.id}/subtareas/{sid}", data={"hecho": "1"})
     db.session.expire_all()
     assert db.session.get(Tarea, t.id).subtareas[0].hecho
+    reg = Auditoria.query.filter_by(accion="marcar_subtarea").one()
+    assert reg.entidad_id == str(t.id) and reg.detalle["hecho"] is True
 
 
 # ------------------------------------------------------------------ eliminar / papelera
@@ -310,3 +312,17 @@ def test_pantallas_se_muestran(como, rol, sigla):
     html = c.get(f"/tareas/{t.id}/editar").get_data(as_text=True)
     assert 'name="subtareas-0-texto"' in html and 'value="Paso"' in html
     assert ('name="unidad_id"' in html) == (rol != "unidad")
+
+
+def test_texto_filtros_incluye_estado_prioridad_y_responsable(app, hacer_usuario):
+    from flask_login import login_user
+
+    from app.controllers.tareas import formulario_filtros, texto_filtros
+
+    u = hacer_usuario("admin")
+    args = {"estado_id": cat("estado", "Pendiente"), "prioridad_id": cat("prioridad", "Alta"),
+            "responsable_id": cargo("UAF").id}
+    with app.test_request_context("/tareas", query_string=args):
+        login_user(u)
+        texto = texto_filtros(formulario_filtros())
+    assert "Estado: Pendiente" in texto and "Prioridad: Alta" in texto and "Responsable: UAF · Apoyo" in texto

@@ -82,8 +82,8 @@
       data: {
         labels: d.mensual.etiquetas,
         datasets: [
-          { label: "Creadas", data: d.mensual.creadas, borderColor: AZUL2, backgroundColor: AZUL2, tension: 0.25 },
-          { label: "Concluidas", data: d.mensual.concluidas, borderColor: VERDE, backgroundColor: VERDE, tension: 0.25 }
+          { label: "Creadas", data: d.mensual.creadas, borderColor: AZUL2, backgroundColor: AZUL2, cubicInterpolationMode: "monotone" },
+          { label: "Concluidas", data: d.mensual.concluidas, borderColor: VERDE, backgroundColor: VERDE, cubicInterpolationMode: "monotone" }
         ]
       },
       options: {

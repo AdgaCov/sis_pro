@@ -105,18 +105,6 @@ def resumen_ejecutivo(infos: list[al.InfoTarea], unidades) -> dict:
     }
 
 
-def kpis_generales(infos: list[al.InfoTarea]) -> list[tuple]:
-    abiertas = [i for i in infos if not i.concluida]
-    return [
-        ("Tareas abiertas", len(abiertas), False),
-        ("Vencidas", _contar(abiertas, lambda i: i.alerta == al.VENCIDO), True),
-        ("Por vencer", _contar(abiertas, lambda i: i.alerta == al.POR_VENCER), True),
-        ("Críticas", _contar(abiertas, lambda i: i.critica), True),
-        ("Sin responsable", _contar(abiertas, lambda i: i.sin_responsable), True),
-        ("Concluidas", len(infos) - len(abiertas), False),
-    ]
-
-
 # ------------------------------------------------------------------ alertas
 def _hace(n: int) -> str:
     return "hoy" if n == 0 else ("hace 1 día" if n == 1 else f"hace {n} días")

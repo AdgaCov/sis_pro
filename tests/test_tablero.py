@@ -212,6 +212,21 @@ def test_inicio_muestra_indicadores_y_enlaces(como, tarea):
     c, _ = como("unidad", "UAF")
     html = c.get("/").get_data(as_text=True)
     assert "Vencidas" in html and "/tablero/alertas" in html
+    # el inicio es el dashboard: trae los gráficos (unidad: próximos vencimientos en vez de barras)
+    assert 'id="datosGraficos"' in html and "Cumplimiento de plazos" in html
+    assert "Próximos vencimientos" in html and "chart.umd.min.js" in html
+
+
+def test_inicio_admin_tiene_graficos_por_unidad_y_filtro(como, tarea):
+    _datos_de_prueba(tarea)
+    c, _ = como("admin")
+    html = c.get("/").get_data(as_text=True)
+    assert 'id="gUnidades"' in html and "Cumplimiento por unidad" in html and 'action="/"' in html
+    # filtrando por una unidad, deja de comparar unidades
+    from tests.conftest import unidad
+    uaf = unidad("UAF").id
+    html = c.get(f"/?unidad_id={uaf}").get_data(as_text=True)
+    assert 'id="gUnidades"' not in html and "Próximos vencimientos" in html
 
 
 def test_detalle_muestra_alerta_y_senales(como, tarea):
@@ -219,3 +234,33 @@ def test_detalle_muestra_alerta_y_senales(como, tarea):
     c, _ = como("unidad", "UAF")
     html = c.get(f"/tareas/{t.id}").get_data(as_text=True)
     assert "VENCIDO" in html and "Sin responsable" in html
+
+
+# ------------------------------------------------------------------ PDF del informe crítico
+@pytest.fixture
+def pdf_legible(monkeypatch):
+    from reportlab import rl_config
+
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+
+
+def test_informe_critico_se_descarga_en_pdf(como, tarea, pdf_legible):
+    from app.models import Auditoria
+
+    _datos_de_prueba(tarea)  # una vencida en UAF y otra en UPT
+    c, _ = como("admin")
+    assert "/tablero/informe.pdf" in c.get("/tablero/informe").get_data(as_text=True)
+    r = c.get("/tablero/informe.pdf")
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF")
+    assert "Informe_Critico_" in r.headers["Content-Disposition"]
+    assert b"UAF-001" in r.data and b"UPT-001" in r.data and b"Sin definir" in r.data
+    assert Auditoria.query.filter_by(accion="descargar_pdf", entidad="informe").count() == 1
+
+
+def test_informe_pdf_respeta_unidad_y_permisos(como, tarea, pdf_legible):
+    _datos_de_prueba(tarea)
+    c, _ = como("unidad", "UAF")
+    r = c.get("/tablero/informe.pdf")
+    assert b"UAF-001" in r.data and b"UPT-001" not in r.data  # la unidad no ve otra unidad
+    inv, _ = como("invitado", permisos={"todas_unidades": True})
+    assert inv.get("/tablero/informe.pdf").status_code == 403  # el invitado no ve el informe

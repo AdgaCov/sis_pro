@@ -1,19 +1,36 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis as indicadores %}
+{% from "_macros.html" import filtros, menu_documentos %}
+{% macro url_doc(p, formato) %}{{ url_for('documentos.graficos', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
 {% block titulo %}Inicio{% endblock %}
+{% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% block contenido %}
-<h1 class="h4 mb-1">Bienvenido, {{ current_user.nombre_completo }}</h1>
-<p class="text-muted">{{ current_user.nombre_rol }}{% if current_user.unidad %} · {{ current_user.unidad.nombre }}{% endif %}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+  <div>
+    <h1 class="h4 mb-1">Bienvenido, {{ current_user.nombre_completo }}</h1>
+    <p class="text-muted mb-2">{{ current_user.nombre_rol }}{% if current_user.unidad %} · {{ current_user.unidad.nombre }}{% endif %}
+      {% if datos is defined and ver_tareas %}· Pulse un gráfico para ver la lista de tareas ya filtrada.{% endif %}</p>
+  </div>
+  {% if datos is defined %}
+  <div class="text-nowrap">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('tablero.graficos_pdf', **request.args) }}">Descargar PDF</a>
+    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+  </div>
+  {% endif %}
+</div>
 
-{% if kpis %}{{ indicadores(kpis) }}{% endif %}
+{% if datos is defined %}
+  {% if varias_unidades %}{{ filtros(filtro, ['unidad_id'], url_for('inicio.index'), varias_unidades) }}{% endif %}
+  {% include "tablero/_graficos.html" %}
+{% endif %}
 
 {% if enlaces %}
+<h2 class="h6 seccion-titulo mt-4">Accesos</h2>
 <div class="row g-3 mb-4">
   {% for endpoint, titulo, texto in enlaces %}
-  <div class="col-sm-6 col-lg-4">
+  <div class="col-sm-6 col-lg-3">
     <a class="card h-100 text-decoration-none" href="{{ url_for(endpoint) }}">
       <div class="card-body">
-        <h2 class="h6 mb-1 titulo-app">{{ titulo }}</h2>
+        <h3 class="h6 mb-1 titulo-app">{{ titulo }}</h3>
         <p class="small text-muted mb-0">{{ texto }}</p>
       </div>
     </a>
@@ -26,6 +43,12 @@
 
 <p class="small text-muted">
   Unidades que puede ver:
-  {% for u in unidades %}{{ u.sigla }}{{ ', ' if not loop.last }}{% else %}ninguna{% endfor %}
+  {% for u in unidades_usuario %}{{ u.sigla }}{{ ', ' if not loop.last }}{% else %}ninguna{% endfor %}
 </p>
+{% endblock %}
+{% block scripts %}
+{% if datos is defined %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/graficos.js') }}"></script>
+{% endif %}
 {% endblock %}

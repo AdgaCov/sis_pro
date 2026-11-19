@@ -1,11 +1,14 @@
 from app.extensions import db
 from app.utils.fechas import ahora_utc
 
-ALCANCES = ("tarea", "listado", "informe")
+ALCANCES = ("tarea", "listado", "informe", "resumen", "agenda", "graficos")
 NOMBRES_ALCANCE = {
     "tarea": "Ficha de una tarea",
     "listado": "Listado (lo que muestra el filtro)",
     "informe": "Informe de tareas críticas",
+    "resumen": "Resumen ejecutivo (gestiones con el MRE)",
+    "agenda": "Agenda Despacho del mes",
+    "graficos": "Tablero con gráficos",
 }
 FORMATOS = ("docx", "xlsx")
 

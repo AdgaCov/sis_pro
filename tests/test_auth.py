@@ -159,3 +159,21 @@ def test_csrf_obligatorio():
             assert r.status_code == 400
         finally:
             db.drop_all()
+
+
+def test_app_config_invalido_da_mensaje_claro(monkeypatch):
+    with pytest.raises(RuntimeError, match="APP_CONFIG"):
+        create_app("no-existe")
+
+
+def test_error_interno_muestra_pagina_propia(app, como):
+    """Un fallo inesperado responde 500 con la página de la app (no la de Werkzeug)."""
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+
+    @app.get("/_falla")
+    def _falla():
+        raise RuntimeError("boom")
+
+    c, _ = como("admin")
+    r = c.get("/_falla")
+    assert r.status_code == 500 and "error inesperado" in r.get_data(as_text=True)

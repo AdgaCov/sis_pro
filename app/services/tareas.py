@@ -199,6 +199,8 @@ def marcar_subtarea(usuario: Usuario, tarea: Tarea, subtarea_id: int, hecho: boo
         raise ErrorNegocio("La subtarea no existe.")
     sub.hecho = hecho
     _marcar_actualizada(tarea, usuario)
+    auditoria.registrar("marcar_subtarea", usuario, "tarea", tarea.id,
+                        {"codigo": tarea.codigo, "subtarea": sub.texto[:100], "hecho": hecho})
     db.session.commit()
 
 

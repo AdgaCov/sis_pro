@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis, filtros %}
+{% from "_macros.html" import kpis, filtros, menu_documentos %}
+{% macro url_doc(p, formato) %}{{ url_for('documentos.resumen_ejecutivo', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
 {% block titulo %}Resumen ejecutivo{% endblock %}
 {% block contenedor %}container-fluid py-4 px-md-4{% endblock %}
 {% block contenido %}
@@ -8,7 +9,10 @@
     <h1 class="h4 mb-1">Resumen ejecutivo · Gestiones con el MRE</h1>
     <p class="text-muted">Solicitudes, autorizaciones y gestiones con el MRE. Las tareas internas no se incluyen.</p>
   </div>
-  <a class="btn btn-primary btn-sm no-imprimir" href="{{ url_for('tablero.resumen_pdf', **request.args) }}">Descargar PDF</a>
+  <div class="text-nowrap">
+    <a class="btn btn-primary btn-sm no-imprimir" href="{{ url_for('tablero.resumen_pdf', **request.args) }}">Descargar PDF</a>
+    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+  </div>
 </div>
 <p class="solo-imprimir small">Generado el {{ ahora|fecha_hora }} por {{ current_user.nombre_usuario }}</p>
 

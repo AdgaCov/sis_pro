@@ -43,7 +43,10 @@ def lista():
 
 @bp.route("/marcadores")
 def marcadores():
-    return render_template("admin/plantillas/marcadores.html", marcadores=srv.MARCADORES)
+    from app.models.plantilla import NOMBRES_ALCANCE
+
+    return render_template("admin/plantillas/marcadores.html", grupos=srv.GRUPOS_MARCADORES,
+                           filas_excel=srv.FILAS_EXCEL, nombres_alcance=NOMBRES_ALCANCE)
 
 
 @bp.route("/nueva", methods=["GET", "POST"])

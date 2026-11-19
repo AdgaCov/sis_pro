@@ -86,6 +86,7 @@ def restablecer(usuario_id: int):
     try:
         clave = srv.restablecer_clave(usuario, current_user)
     except ErrorNegocio as e:
+        db.session.rollback()
         flash(str(e), "danger")
         return redirect(url_for(".lista"))
     return render_template("admin/usuarios/clave_temporal.html", usuario=usuario, clave=clave, nuevo=False)
@@ -100,6 +101,7 @@ def estado(usuario_id: int):
     try:
         srv.cambiar_estado(usuario, activar, current_user)
     except ErrorNegocio as e:
+        db.session.rollback()
         flash(str(e), "danger")
     else:
         flash(f"Usuario «{usuario.nombre_usuario}» {'activado' if activar else 'desactivado'}.", "success")

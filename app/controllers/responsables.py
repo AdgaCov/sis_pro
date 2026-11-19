@@ -106,9 +106,9 @@ def estado(cargo_id: int):
 @bp.route("/<int:cargo_id>/mover", methods=["POST"])
 @solo_lectura
 def mover(cargo_id: int):
+    cargo = _cargo_editable(cargo_id)  # 404 si no lo ve: no revela cargos de otras unidades
     if not current_user.es_admin:
         abort(403)
-    cargo = _cargo_editable(cargo_id)
     form = MoverCargoForm()
     form.unidad_id.choices = [(u.id, u.sigla) for u in Unidad.query.all()]
     if not form.validate_on_submit():

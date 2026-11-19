@@ -26,11 +26,16 @@ def estado_agenda(estado: str) -> str:
     return "En gestión"
 
 
+ANIO_MIN, ANIO_MAX = 2000, 2100  # fuera de este rango el calendario y la navegación no tienen sentido
+
+
 def leer_mes(texto: str | None, hoy: date | None = None) -> date:
-    """'2026-11' → date(2026, 11, 1). Si no es válido, el mes actual."""
+    """'2026-11' → date(2026, 11, 1). Si no es válido (o el año es absurdo), el mes actual."""
     hoy = hoy or hoy_local()
     try:
         anio, mes = (int(x) for x in (texto or "").split("-"))
+        if not ANIO_MIN <= anio <= ANIO_MAX:
+            raise ValueError
         return date(anio, mes, 1)
     except ValueError:
         return hoy.replace(day=1)
@@ -89,6 +94,14 @@ def calendario(mes: date, evs: list[dict], hoy: date | None = None) -> list[list
         semanas.append([{"fecha": d, "en_mes": d.month == mes.month, "hoy": d == hoy,
                          "eventos": por_dia.get(d, []), "peor": _peor(por_dia.get(d, []))} for d in semana])
     return semanas
+
+
+def mes_en_pantalla(mes: date, evs: list[dict], hoy: date | None = None, elegido: bool = False) -> dict:
+    """Un mes de la vista de tres meses. Los días de otros meses no muestran eventos (ya salen en su mes)."""
+    semanas = calendario(mes, [e for e in evs if (e["fecha"].year, e["fecha"].month) == (mes.year, mes.month)], hoy)
+    del_mes = sum(1 for e in evs if (e["fecha"].year, e["fecha"].month) == (mes.year, mes.month))
+    return {"mes": mes, "clave": f"{mes:%Y-%m}", "titulo": nombre_mes(mes), "semanas": semanas,
+            "eventos": del_mes, "elegido": elegido}
 
 
 def rango_calendario(mes: date) -> tuple[date, date]:

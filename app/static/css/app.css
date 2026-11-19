@@ -136,6 +136,14 @@ fieldset:disabled .lista-checks { opacity: .5; }
 .calendario td.dia-VENCIDO { background: #FDECEA; } .calendario td.dia-CRITICO { background: #FDECEA; }
 .calendario td.dia-POR-VENCER, .calendario td.dia-SEGUIMIENTO { background: #FFF4DE; }
 .ag-num { font-weight: 700; color: var(--azul); }
+/* vista de tres meses: celdas compactas con el código de cada evento */
+.calendario-3 { min-width: 0; }
+.calendario-3 th { font-size: .68rem; padding: 2px; }
+.calendario-3 td { height: 78px; padding: 2px; font-size: .66rem; }
+.calendario-3 td.fuera .ag-num { color: #B8BFCC; font-weight: 400; }
+.calendario-3 .ag-ev { padding: 0 2px; margin-top: 1px; font-size: .62rem; line-height: 1.25;
+                        white-space: normal; overflow-wrap: anywhere; }
+.mes-elegido { border: 2px solid var(--azul); }
 .ag-ev { border-left: 3px solid var(--suave); padding: 1px 4px; margin-top: 2px; background: rgba(255,255,255,.75);
          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ag-ev.hecho { text-decoration: line-through; color: var(--suave); }

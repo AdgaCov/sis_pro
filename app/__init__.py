@@ -10,6 +10,8 @@ from config import CONFIGURACIONES
 def create_app(nombre_config: str | None = None) -> Flask:
     app = Flask(__name__)
     nombre_config = nombre_config or os.getenv("APP_CONFIG", "desarrollo")
+    if nombre_config not in CONFIGURACIONES:
+        raise RuntimeError(f"APP_CONFIG «{nombre_config}» no válido. Use: {', '.join(CONFIGURACIONES)}.")
     app.config.from_object(CONFIGURACIONES[nombre_config])
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("Falta SECRET_KEY en el archivo .env")
@@ -103,6 +105,11 @@ def _registrar_plantillas(app: Flask) -> None:
 
 
 def _registrar_errores(app: Flask) -> None:
+    @app.errorhandler(400)
+    def solicitud_invalida(_e):
+        return render_template("errores/error.html", codigo=400,
+                               mensaje="La solicitud no es válida. Vuelva atrás e intente de nuevo."), 400
+
     @app.errorhandler(403)
     def prohibido(_e):
         return render_template("errores/error.html", codigo=403,
@@ -122,3 +129,10 @@ def _registrar_errores(app: Flask) -> None:
     def csrf_error(_e):
         return render_template("errores/error.html", codigo=400,
                                mensaje="El formulario expiró. Recargue la página e intente de nuevo."), 400
+
+    @app.errorhandler(500)
+    def error_interno(_e):
+        # Deja la sesión de base limpia para la siguiente petición; el detalle queda en el log.
+        db.session.rollback()
+        return render_template("errores/error.html", codigo=500,
+                               mensaje="Ocurrió un error inesperado. Intente de nuevo o avise a Planificación."), 500

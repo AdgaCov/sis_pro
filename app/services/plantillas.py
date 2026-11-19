@@ -12,7 +12,8 @@ import zipfile
 from copy import copy
 from pathlib import Path
 
-from docxtpl import DocxTemplate
+from docx.shared import Mm
+from docxtpl import DocxTemplate, InlineImage
 from flask import current_app
 from jinja2 import ChainableUndefined, TemplateError, nodes
 from jinja2.sandbox import SandboxedEnvironment
@@ -22,63 +23,162 @@ from app.extensions import db
 from app.models import Plantilla, Usuario
 from app.models.plantilla import ALCANCES
 from app.services import ErrorNegocio, alertas, auditoria
+from app.services import imagenes as imagenes_png
 from app.utils.fechas import ahora_utc, formato_fecha, formato_fecha_hora
 
 # ------------------------------------------------------------------ catálogo de marcadores
-MARCADORES = {
-    "unidad.nombre": "Nombre de la unidad (o «Todas las unidades» en listados)",
-    "unidad.sigla": "Sigla de la unidad",
-    "tarea.codigo": "Código (UAF-001)",
-    "tarea.unidad": "Sigla de la unidad de la tarea",
-    "tarea.unidad_nombre": "Nombre de la unidad de la tarea",
-    "tarea.tipo": "Tipo",
-    "tarea.area": "Área funcional",
-    "tarea.instancia": "Instancia del MRE",
-    "tarea.asunto": "Tarea / asunto",
-    "tarea.gestion": "Gestión requerida / acción",
-    "tarea.que_habilita": "¿Qué habilita?",
-    "tarea.habilita_a": "Código de la tarea que habilita",
-    "tarea.riesgo_demora": "Riesgo por demora",
-    "tarea.responsable": "Responsable (cargo)",
-    "tarea.persona": "Persona designada en el cargo",
-    "tarea.hoja_ruta": "Hoja de ruta",
-    "tarea.fecha_solicitud": "Fecha de solicitud / inicio (dd/mm/aaaa)",
-    "tarea.fecha_limite": "Fecha límite (dd/mm/aaaa)",
-    "tarea.fecha_conclusion": "Fecha de conclusión (dd/mm/aaaa)",
-    "tarea.estado": "Estado",
-    "tarea.prioridad": "Prioridad",
-    "tarea.alerta": "Alerta calculada (VENCIDO, CRÍTICO…)",
-    "tarea.dias": "Días desde la solicitud",
-    "tarea.faltan": "Días que faltan para la fecha límite (negativo = vencida)",
-    "tarea.nivel_riesgo": "Nivel de riesgo",
-    "tarea.solucion": "Línea de solución",
-    "tarea.plazo_solucion": "Plazo de la solución (dd/mm/aaaa)",
-    "tarea.resultado": "Resultado obtenido",
-    "tarea.medio_verificacion": "Descripción del respaldo",
-    "tarea.observaciones": "Observaciones",
-    "tarea.actualizado": "Última actualización (dd/mm/aaaa hh:mm)",
-    "tarea.subtareas": "Lista de subtareas (usar con for)",
-    "subtarea.texto": "Texto del paso",
-    "subtarea.fecha": "Fecha del paso",
-    "subtarea.hecho": "Sí / No",
-    "tareas": "Lista de tareas (usar con for)",
-    "resumen.total": "Total de tareas",
-    "resumen.pendientes": "Tareas abiertas",
-    "resumen.vencidas": "Abiertas vencidas",
-    "resumen.por_vencer": "Abiertas por vencer",
-    "resumen.criticas": "Tareas críticas",
-    "resumen.concluidas": "Concluidas",
-    "resumen.sin_solucion": "Críticas sin línea de solución",
-    "generado.fecha": "Fecha y hora de generación",
-    "generado.por": "Usuario que generó el documento",
-    "generado.filtros": "Filtros aplicados (listados)",
-}
+TODOS = ("tarea", "listado", "informe", "resumen", "agenda", "graficos")
+
+# (título, alcances donde sirve, {marcador: descripción}). La página Admin › Plantillas › Marcadores lo muestra así.
+GRUPOS_MARCADORES = [
+    ("Generales", TODOS, {
+        "unidad.nombre": "Nombre de la unidad (o «Todas las unidades»)",
+        "unidad.sigla": "Sigla de la unidad",
+        "generado.fecha": "Fecha y hora de generación",
+        "generado.por": "Usuario que generó el documento",
+        "generado.filtros": "Filtros aplicados (listado, resumen, agenda)",
+        "resumen.total": "Total de tareas del documento",
+        "resumen.pendientes": "Tareas abiertas",
+        "resumen.vencidas": "Abiertas vencidas",
+        "resumen.por_vencer": "Abiertas por vencer",
+        "resumen.criticas": "Tareas críticas",
+        "resumen.concluidas": "Concluidas",
+        "resumen.sin_solucion": "Críticas sin línea de solución",
+    }),
+    ("Una tarea (ficha) · en listas: t.xxx", TODOS, {
+        "tarea.codigo": "Código (UAF-001)",
+        "tarea.unidad": "Sigla de la unidad de la tarea",
+        "tarea.unidad_nombre": "Nombre de la unidad de la tarea",
+        "tarea.tipo": "Tipo",
+        "tarea.area": "Área funcional",
+        "tarea.instancia": "Instancia del MRE",
+        "tarea.asunto": "Tarea / asunto",
+        "tarea.gestion": "Gestión requerida / acción",
+        "tarea.que_habilita": "¿Qué habilita?",
+        "tarea.habilita_a": "Código de la tarea que habilita",
+        "tarea.riesgo_demora": "Riesgo por demora",
+        "tarea.responsable": "Responsable (cargo)",
+        "tarea.persona": "Persona designada en el cargo",
+        "tarea.hoja_ruta": "Hoja de ruta",
+        "tarea.fecha_solicitud": "Fecha de solicitud / inicio (dd/mm/aaaa)",
+        "tarea.fecha_limite": "Fecha límite (dd/mm/aaaa)",
+        "tarea.fecha_conclusion": "Fecha de conclusión (dd/mm/aaaa)",
+        "tarea.estado": "Estado",
+        "tarea.prioridad": "Prioridad",
+        "tarea.alerta": "Alerta calculada (VENCIDO, CRÍTICO…)",
+        "tarea.dias": "Días desde la solicitud",
+        "tarea.faltan": "Días que faltan para la fecha límite (negativo = vencida)",
+        "tarea.nivel_riesgo": "Nivel de riesgo",
+        "tarea.solucion": "Línea de solución",
+        "tarea.plazo_solucion": "Plazo de la solución (dd/mm/aaaa)",
+        "tarea.resultado": "Resultado obtenido",
+        "tarea.medio_verificacion": "Descripción del respaldo",
+        "tarea.observaciones": "Observaciones",
+        "tarea.actualizado": "Última actualización (dd/mm/aaaa hh:mm)",
+        "tarea.subtareas": "Lista de subtareas (usar con for)",
+        "subtarea.texto": "Texto del paso",
+        "subtarea.fecha": "Fecha del paso",
+        "subtarea.hecho": "Sí / No",
+        "tareas": "Lista de tareas del documento (usar con for; en Excel, fila con t.xxx)",
+    }),
+    ("Resumen ejecutivo", ("resumen",), {
+        "indicadores.total_mre": "Total de gestiones con el MRE",
+        "indicadores.pendientes": "Pendientes",
+        "indicadores.vencidas": "Vencidas",
+        "indicadores.sin_respuesta": "Sin respuesta del MRE",
+        "indicadores.alta_prioridad": "Alta prioridad pendiente",
+        "por_unidad": "Gestiones por unidad (usar con for; en Excel, fila con u.xxx)",
+        "fila_unidad.sigla": "Sigla de la unidad",
+        "fila_unidad.nombre": "Nombre de la unidad",
+        "fila_unidad.total": "Total de gestiones",
+        "fila_unidad.pendientes": "Pendientes",
+        "fila_unidad.vencidas": "Vencidas",
+        "fila_unidad.alta": "Alta prioridad pendiente",
+        "fila_unidad.sin_respuesta": "Sin respuesta del MRE",
+        "fila_unidad.concluidas": "Concluidas",
+        "por_instancia": "Pendientes por instancia del MRE (for; en Excel, fila con i.xxx)",
+        "fila_instancia.nombre": "Instancia",
+        "fila_instancia.pendientes": "Pendientes",
+        "por_tipo": "Pendientes por tipo (for; en Excel, fila con p.xxx)",
+        "fila_tipo.nombre": "Tipo",
+        "fila_tipo.pendientes": "Pendientes",
+    }),
+    ("Agenda Despacho", ("agenda",), {
+        "mes.nombre": "Mes de la agenda (Noviembre 2026)",
+        "mes.desde": "Primer día del mes (dd/mm/aaaa)",
+        "mes.hasta": "Último día del mes (dd/mm/aaaa)",
+        "indicadores.fechas_limite": "Fechas límite del mes",
+        "indicadores.vencidas": "Fechas límite vencidas",
+        "indicadores.recordatorios_pendientes": "Recordatorios pendientes",
+        "indicadores.recordatorios_vencidos": "Recordatorios vencidos",
+        "indicadores.bloqueadas": "Tareas bloqueadas (observado / devuelto)",
+        "eventos": "Eventos del mes, por fecha (usar con for; en Excel, fila con e.xxx)",
+        "evento.fecha": "Fecha (dd/mm/aaaa)",
+        "evento.dia": "Día de la semana",
+        "evento.tipo": "Fecha límite / Recordatorio",
+        "evento.codigo": "Código de la tarea",
+        "evento.unidad": "Sigla de la unidad",
+        "evento.texto": "Asunto (fecha límite) o texto del recordatorio",
+        "evento.asunto": "Asunto de la tarea",
+        "evento.responsable": "Responsable (cargo)",
+        "evento.persona": "Persona designada",
+        "evento.estado": "Estado de la tarea",
+        "evento.estado_agenda": "Pendiente / En gestión / Bloqueada / Concluida",
+        "evento.alerta": "Alerta",
+        "evento.hecho": "Sí / No (recordatorios)",
+    }),
+    ("Tablero con gráficos", ("graficos",), {
+        "indicadores.pendientes": "Pendientes",
+        "indicadores.vencidas": "Vencidas",
+        "indicadores.por_vencer": "Por vencer",
+        "indicadores.sin_respuesta": "Sin respuesta del MRE",
+        "indicadores.concluidas_mes": "Concluidas este mes",
+        "indicadores.variacion": "% de variación de concluidas contra el mes anterior",
+        "cumplimiento.porcentaje": "% de concluidas a tiempo",
+        "cumplimiento.base": "Concluidas con fecha límite (base del %)",
+        "cumplimiento.meta": "Meta de cumplimiento (%)",
+        "por_unidad": "Pendientes por unidad y alerta (for; en Excel, fila con u.xxx)",
+        "fila_unidad.sigla": "Sigla de la unidad",
+        "fila_unidad.nombre": "Nombre de la unidad",
+        "fila_unidad.pendientes": "Pendientes",
+        "fila_unidad.vencido": "Vencidas",
+        "fila_unidad.critico": "Críticas",
+        "fila_unidad.por_vencer": "Por vencer",
+        "fila_unidad.seguimiento": "En seguimiento",
+        "fila_unidad.en_curso": "En curso",
+        "fila_unidad.sin_fecha": "Sin fecha",
+        "fila_unidad.cumplimiento": "% concluidas a tiempo de la unidad",
+        "mensual": "Creadas y concluidas por mes, 12 meses (for; en Excel, fila con m.xxx)",
+        "fila_mes.mes": "Mes (nov 26)",
+        "fila_mes.creadas": "Tareas creadas",
+        "fila_mes.concluidas": "Tareas concluidas",
+        "embudo": "Abiertas por estado (for; en Excel, fila con f.xxx)",
+        "fila_estado.estado": "Estado",
+        "fila_estado.tareas": "Tareas abiertas en ese estado",
+        "por_instancia": "Instancias del MRE con más pendientes (for; en Excel, fila con i.xxx)",
+        "fila_instancia.nombre": "Instancia",
+        "fila_instancia.pendientes": "Pendientes",
+        "imagen.barras": "Imagen: pendientes por unidad (solo Word)",
+        "imagen.cumplimiento": "Imagen: velocímetro de cumplimiento (solo Word)",
+        "imagen.mensual": "Imagen: creadas contra concluidas (solo Word)",
+        "imagen.embudo": "Imagen: embudo de estados (solo Word)",
+    }),
+]
+MARCADORES = {m: d for _, _, grupo in GRUPOS_MARCADORES for m, d in grupo.items()}
+
 # Qué es cada elemento de una lista recorrida con for
-LISTAS = {"tareas": "tarea", "tarea.subtareas": "subtarea"}
+LISTAS = {"tareas": "tarea", "tarea.subtareas": "subtarea", "por_unidad": "fila_unidad",
+          "por_instancia": "fila_instancia", "por_tipo": "fila_tipo", "eventos": "evento", "mensual": "fila_mes",
+          "embudo": "fila_estado"}
+# Excel: una fila con marcadores <letra>.xxx se repite una vez por elemento de la lista
+FILAS_EXCEL = {"t": "tareas", "u": "por_unidad", "i": "por_instancia", "p": "por_tipo", "e": "eventos",
+               "m": "mensual", "f": "embudo"}
+ALIAS_EXCEL = {letra: LISTAS[lista] for letra, lista in FILAS_EXCEL.items()}
 CAMPOS_TAREA = [m.split(".", 1)[1] for m in MARCADORES if m.startswith("tarea.")]
+ANCHO_IMAGEN_MM = {"barras": 160, "cumplimiento": 80, "mensual": 160, "embudo": 160}
 
 EXTENSIONES = {"docx", "xlsx"}
-_FILA_REPETIBLE = re.compile(r"\{\{[^}]*\bt\.")
+_FILA_REPETIBLE = re.compile(r"\{\{[^}]*?\b([" + "".join(FILAS_EXCEL) + r"])\.")
 _SOLO_MARCADOR = re.compile(r"^\s*\{\{\s*(.+?)\s*\}\}\s*$", re.S)
 
 
@@ -169,7 +269,7 @@ def analizar(datos: bytes, formato: str) -> list[str]:
             usados |= marcadores_en(texto)
     else:
         for texto in _celdas_xlsx(datos):
-            usados |= marcadores_en(texto, {"t": "tarea"})
+            usados |= marcadores_en(texto, ALIAS_EXCEL)
     return sorted(r for r in usados if not es_conocido(r))
 
 
@@ -275,6 +375,11 @@ def activas(alcance: str) -> list[Plantilla]:
     return Plantilla.query.filter_by(alcance=alcance, activa=True).order_by(Plantilla.nombre).all()
 
 
+def activas_para(usuario: Usuario, alcance: str) -> list[Plantilla]:
+    """Plantillas que el usuario puede generar desde una vista: el invitado no genera documentos."""
+    return [] if usuario.es_invitado else activas(alcance)
+
+
 # ------------------------------------------------------------------ datos para los marcadores
 def _txt(v) -> str:
     return "" if v is None else str(v)
@@ -363,12 +468,142 @@ def contexto_ejemplo(usuario: Usuario) -> dict:
         "resumen": {"total": 3, "pendientes": 3, "vencidas": 1, "por_vencer": 1, "criticas": 2, "sin_solucion": 1, "concluidas": 0},
         "generado": {"fecha": formato_fecha_hora(ahora_utc()), "por": usuario.nombre_usuario,
                      "filtros": "Datos de ejemplo"},
+        **_ejemplo_tablero(),
     }
+
+
+def _ejemplo_tablero() -> dict:
+    """Datos ficticios de resumen, agenda y gráficos (para «Probar» cualquier plantilla)."""
+    unidades = [("UAF", "UAF - Unidad Administrativa Financiera"), ("UPT", "UPT - Unidad de Promoción Turística")]
+    barras = {"etiquetas": [u for u, _ in unidades], "unidades": [1, 2],
+              "series": [{"alerta": a, "color": c, "valores": v} for a, c, v in (
+                  (alertas.VENCIDO, "#B42318", [2, 1]), (alertas.POR_VENCER, "#D49A2A", [1, 0]),
+                  (alertas.EN_CURSO, "#2E4A7D", [3, 2]))]}
+    mensual = {"etiquetas": ["sep 26", "oct 26", "nov 26"], "creadas": [4, 6, 3], "concluidas": [2, 5, 4]}
+    embudo = [{"id": 1, "estado": "Pendiente", "valor": 3}, {"id": 2, "estado": "En proceso", "valor": 4}]
+    graficos_ = {"barras": barras, "mensual": mensual, "embudo": embudo,
+                 "cumplimiento": {"pct": 75, "base": 8, "meta": 80}}
+    return {
+        "indicadores": {"total_mre": 12, "pendientes": 9, "vencidas": 3, "sin_respuesta": 2, "alta_prioridad": 4,
+                        "por_vencer": 1, "concluidas_mes": 4, "variacion": 33, "fechas_limite": 5,
+                        "recordatorios_pendientes": 6, "recordatorios_vencidos": 1, "bloqueadas": 1},
+        "por_unidad": [{"sigla": s, "nombre": n, "total": 6, "pendientes": 4 + k, "vencidas": 2 - k, "alta": 2,
+                        "sin_respuesta": 1, "concluidas": 2, "vencido": 2 - k, "critico": 0, "por_vencer": 1 - k,
+                        "seguimiento": 0, "en_curso": 3 - k, "sin_fecha": 0, "cumplimiento": 80 - 20 * k}
+                       for k, (s, n) in enumerate(unidades)],
+        "por_instancia": [{"nombre": "Despacho Ministerial", "pendientes": 4}, {"nombre": "CIAAAT", "pendientes": 2}],
+        "por_tipo": [{"nombre": "Solicitud al MRE", "pendientes": 6}, {"nombre": "Autorización del MRE", "pendientes": 3}],
+        "mes": {"nombre": "Noviembre 2026", "desde": "01/11/2026", "hasta": "30/11/2026"},
+        "eventos": [
+            {"fecha": "10/11/2026", "dia": "Martes", "tipo": "Fecha límite", "codigo": "UAF-001", "unidad": "UAF",
+             "texto": "Tarea de ejemplo 1", "asunto": "Tarea de ejemplo 1", "responsable": "Jefe Administrativo",
+             "persona": "Nombre Apellido", "estado": "En proceso", "estado_agenda": "En gestión",
+             "alerta": "VENCIDO", "hecho": "No"},
+            {"fecha": "20/11/2026", "dia": "Viernes", "tipo": "Recordatorio", "codigo": "UAF-002", "unidad": "UAF",
+             "texto": "Paso de ejemplo", "asunto": "Tarea de ejemplo 2", "responsable": "Técnico", "persona": "",
+             "estado": "Pendiente", "estado_agenda": "Pendiente", "alerta": "POR VENCER", "hecho": "Sí"},
+        ],
+        "cumplimiento": {"porcentaje": 75, "base": 8, "meta": 80},
+        "mensual": [{"mes": m, "creadas": c, "concluidas": x}
+                    for m, c, x in zip(mensual["etiquetas"], mensual["creadas"], mensual["concluidas"])],
+        "embudo": [{"estado": f["estado"], "tareas": f["valor"]} for f in embudo],
+        "_graficos": graficos_,
+    }
+
+
+# ------------------------------------------------------------------ resumen, agenda y gráficos
+DIAS_SEMANA = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+CLAVE_ALERTA = {alertas.VENCIDO: "vencido", alertas.CRITICO: "critico", alertas.POR_VENCER: "por_vencer",
+                alertas.SEGUIMIENTO: "seguimiento", alertas.EN_CURSO: "en_curso", alertas.SIN_FECHA: "sin_fecha"}
+
+
+def _valores(kpis, claves) -> dict:
+    return dict(zip(claves, (v for _, v, _ in kpis)))
+
+
+def contexto_resumen(datos: dict, detalle: list, usuario: Usuario, unidad=None, filtros: str = "") -> dict:
+    """`datos` de services.resumen.resumen_ejecutivo; `tareas` es el detalle filtrado (solo gestiones con el MRE)."""
+    ctx = contexto(detalle, usuario, unidad, filtros)
+    ctx["indicadores"] = _valores(datos["kpis"], ("total_mre", "pendientes", "vencidas", "sin_respuesta",
+                                                  "alta_prioridad"))
+    ctx["por_unidad"] = [{"sigla": r["unidad"].sigla, "nombre": r["unidad"].nombre,
+                          **{k: r[k] for k in ("total", "pendientes", "vencidas", "alta", "sin_respuesta",
+                                               "concluidas")}} for r in datos["por_unidad"]]
+    ctx["por_instancia"] = [{"nombre": n, "pendientes": c} for n, c in datos["por_instancia"]]
+    ctx["por_tipo"] = [{"nombre": n, "pendientes": c} for n, c in datos["por_tipo"]]
+    return ctx
+
+
+def _evento(e: dict) -> dict:
+    t = e["info"].t
+    return {
+        "fecha": formato_fecha(e["fecha"]), "dia": DIAS_SEMANA[e["fecha"].weekday()],
+        "tipo": "Fecha límite" if e["tipo"] == "limite" else "Recordatorio",
+        "codigo": t.codigo, "unidad": t.unidad.sigla, "texto": e["texto"], "asunto": t.asunto,
+        "responsable": t.responsable.nombre if t.responsable else "",
+        "persona": _txt(t.responsable.persona) if t.responsable else "",
+        "estado": t.estado.valor if t.estado else "", "estado_agenda": e["estado_agenda"],
+        "alerta": e["alerta"], "hecho": "Sí" if e["hecho"] else "No",
+    }
+
+
+def contexto_agenda(mes, evs: list, kpis: list, usuario: Usuario, unidad=None, filtros: str = "") -> dict:
+    """`evs`: eventos del mes (services.agenda.eventos); `tareas`: las tareas que tienen algún evento."""
+    import calendar
+
+    vistas, infos = set(), []
+    for e in evs:
+        if e["info"].t.id not in vistas:
+            vistas.add(e["info"].t.id)
+            infos.append(e["info"])
+    ctx = contexto(alertas.ordenar(infos), usuario, unidad, filtros)
+    ultimo = mes.replace(day=calendar.monthrange(mes.year, mes.month)[1])
+    from app.services.agenda import nombre_mes
+    ctx["mes"] = {"nombre": nombre_mes(mes), "desde": formato_fecha(mes), "hasta": formato_fecha(ultimo)}
+    ctx["indicadores"] = _valores(kpis, ("fechas_limite", "vencidas", "recordatorios_pendientes",
+                                         "recordatorios_vencidos", "bloqueadas"))
+    ctx["eventos"] = [_evento(e) for e in evs]
+    return ctx
+
+
+def contexto_graficos(datos: dict, infos: list, unidades, usuario: Usuario, unidad=None) -> dict:
+    """`datos` de services.graficos.datos (lo mismo que dibuja la vista). Las imágenes se arman solo para Word."""
+    from app.services.graficos import cumplimiento_de
+
+    ctx = contexto(alertas.ordenar([i for i in infos if not i.concluida]), usuario, unidad)
+    tarjetas = {k["clave"]: k for k in datos["tarjetas"]}
+    ctx["indicadores"] = {c: tarjetas[c]["valor"] for c in ("pendientes", "vencidas", "por_vencer", "sin_respuesta",
+                                                             "concluidas_mes")}
+    variacion = tarjetas["concluidas_mes"].get("variacion")
+    ctx["indicadores"]["variacion"] = "" if variacion is None else variacion
+    c = datos["cumplimiento"]
+    ctx["cumplimiento"] = {"porcentaje": "" if c["pct"] is None else c["pct"], "base": c["base"], "meta": c["meta"]}
+    filas = []
+    for k, u in enumerate(unidades):
+        fila = {"sigla": u.sigla, "nombre": u.nombre}
+        for s in datos["barras"]["series"]:
+            fila[CLAVE_ALERTA[s["alerta"]]] = s["valores"][k]
+        fila["pendientes"] = sum(s["valores"][k] for s in datos["barras"]["series"])
+        pct, _ = cumplimiento_de([i for i in infos if i.t.unidad_id == u.id])
+        fila["cumplimiento"] = "" if pct is None else pct
+        filas.append(fila)
+    ctx["por_unidad"] = filas
+    m = datos["mensual"]
+    ctx["mensual"] = [{"mes": e, "creadas": a, "concluidas": b}
+                      for e, a, b in zip(m["etiquetas"], m["creadas"], m["concluidas"])]
+    ctx["embudo"] = [{"estado": f["estado"], "tareas": f["valor"]} for f in datos["embudo"]]
+    ctx["por_instancia"] = [{"nombre": x["nombre"], "pendientes": x["valor"]} for x in datos["instancias"]]
+    ctx["_graficos"] = datos
+    return ctx
 
 
 # ------------------------------------------------------------------ generación
 def _render_docx(ruta: Path, ctx: dict) -> bytes:
     tpl = DocxTemplate(str(ruta))
+    imagenes = imagenes_png.todas(ctx["_graficos"]) if ctx.get("_graficos") else {}
+    if imagenes:  # PNG de los gráficos → imágenes del Word ({{ imagen.barras }}…)
+        ctx = {**ctx, "imagen": {k: InlineImage(tpl, io.BytesIO(v), width=Mm(ANCHO_IMAGEN_MM.get(k, 160)))
+                                 for k, v in imagenes.items()}}
     tpl.render(ctx, jinja_env=entorno(), autoescape=True)
     buf = io.BytesIO()
     tpl.save(buf)
@@ -385,21 +620,22 @@ def _valor_celda(env, texto: str, ctx: dict):
     return env.from_string(texto).render(ctx)
 
 
-def _repetir_fila(ws, fila: int, tareas: list, env, ctx: dict) -> None:
+def _repetir_fila(ws, fila: int, letra: str, elementos: list, env, ctx: dict) -> None:
+    """Repite la fila una vez por elemento; cada copia ve el elemento como `letra` (t, u, e…)."""
     modelo = [(c.column, c.value, copy(c._style)) for c in ws[fila]]
     alto = ws.row_dimensions[fila].height
-    if not tareas:
+    if not elementos:
         for col, _, _ in modelo:
             ws.cell(fila, col).value = None
         return
-    extra = len(tareas) - 1
+    extra = len(elementos) - 1
     if extra:
         ws.insert_rows(fila + 1, extra)
         for rango in ws.merged_cells.ranges:
             if rango.min_row > fila:
                 rango.shift(0, extra)
-    for k, t in enumerate(tareas):
-        sub = {**ctx, "t": t}
+    for k, elemento in enumerate(elementos):
+        sub = {**ctx, letra: elemento}
         for col, valor, estilo in modelo:
             celda = ws.cell(fila + k, col)
             celda._style = copy(estilo)
@@ -412,10 +648,14 @@ def _render_xlsx(ruta: Path, ctx: dict) -> bytes:
     wb = load_workbook(ruta)
     env = entorno()
     for ws in wb.worksheets:
-        filas = [r for r in range(1, ws.max_row + 1)
-                 if any(isinstance(c.value, str) and _FILA_REPETIBLE.search(c.value) for c in ws[r])]
-        for r in reversed(filas):
-            _repetir_fila(ws, r, ctx["tareas"], env, ctx)
+        filas = []
+        for r in range(1, ws.max_row + 1):
+            letra = next((m.group(1) for c in ws[r] if isinstance(c.value, str)
+                          for m in [_FILA_REPETIBLE.search(c.value)] if m), None)
+            if letra:
+                filas.append((r, letra))
+        for r, letra in reversed(filas):
+            _repetir_fila(ws, r, letra, ctx.get(FILAS_EXCEL[letra]) or [], env, ctx)
         for fila in ws.iter_rows():
             for c in fila:
                 if isinstance(c.value, str) and ("{{" in c.value or "{%" in c.value):
@@ -434,6 +674,10 @@ def generar(p: Plantilla, ctx: dict) -> bytes:
         return _render_docx(ruta, ctx) if p.formato == "docx" else _render_xlsx(ruta, ctx)
     except TemplateError as e:  # incluye SecurityError del sandbox
         raise ErrorNegocio(f"No se pudo llenar la plantilla «{p.nombre}»: {e}") from e
+    except Exception as e:  # p. ej. {{ tarea.codigo + 1 }} (TypeError) o un archivo dañado
+        current_app.logger.exception("Fallo al llenar la plantilla %s", p.id)
+        raise ErrorNegocio(f"No se pudo llenar la plantilla «{p.nombre}»: revise sus marcadores "
+                           f"({type(e).__name__}).") from e
 
 
 MIMES = {

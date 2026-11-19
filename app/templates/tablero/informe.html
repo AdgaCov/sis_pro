@@ -11,6 +11,7 @@
       de riesgo alto o de prioridad alta por vencer.</p>
   </div>
   <div class="text-nowrap">
+    <a class="btn btn-primary btn-sm no-imprimir" href="{{ url_for('tablero.informe_pdf', unidad_id=filtro.unidad_id.data or None) }}">Descargar PDF</a>
     {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
     <button type="button" class="btn btn-outline-secondary btn-sm no-imprimir" data-imprimir>Imprimir</button>
   </div>

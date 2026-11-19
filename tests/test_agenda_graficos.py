@@ -52,6 +52,8 @@ def test_estado_agenda():
 def test_leer_mes_y_vecinos():
     assert ag.leer_mes("2026-02", HOY) == date(2026, 2, 1)
     assert ag.leer_mes("basura", HOY) == date(2026, 11, 1)
+    # años absurdos: el mes actual (antes 0001-01 o 9999-12 rompían la navegación con error 500)
+    assert ag.leer_mes("0001-01", HOY) == ag.leer_mes("9999-12", HOY) == date(2026, 11, 1)
     assert ag.mes_vecino(date(2026, 12, 1), 1) == date(2027, 1, 1)
     assert ag.mes_vecino(date(2026, 1, 1), -1) == date(2025, 12, 1)
 
@@ -97,6 +99,34 @@ def test_agenda_navega_por_meses(como, datos):
     c, _ = como("admin")
     assert c.get("/agenda?mes=2027-01").status_code == 200
     assert "Enero 2027" in c.get("/agenda?mes=2027-01").get_data(as_text=True)
+    for raro in ("0001-01", "9999-12", "1-1", "2026-13"):
+        assert c.get(f"/agenda?mes={raro}").status_code == 200
+        assert c.get(f"/agenda/agenda.pdf?mes={raro}").status_code == 200
+
+
+def test_agenda_muestra_tres_meses(como, hacer_tarea):
+    """En pantalla: mes anterior, el elegido y el siguiente (también al cambiar de año)."""
+    t = hacer_tarea("UAF")
+    t.asunto, t.fecha_limite = "Vence en febrero", date(2027, 2, 10)
+    db.session.commit()
+    c, _ = como("admin")
+    html = c.get("/agenda?mes=2027-01").get_data(as_text=True)
+    assert html.count('class="col-xl-4"') == 3
+    assert "Diciembre 2026" in html and "Enero 2027" in html and "Febrero 2027" in html
+    assert "Vence en febrero" in html  # el evento del mes siguiente también se ve
+    assert 'href="/agenda?mes=2026-12"' in html and 'href="/agenda?mes=2027-02"' in html  # meses vecinos enlazan
+
+
+def test_mes_en_pantalla_no_repite_eventos_de_otros_meses(hacer_tarea):
+    t = hacer_tarea("UAF")
+    t.fecha_limite = date(2026, 12, 1)  # aparece como relleno al final de la grilla de noviembre
+    db.session.commit()
+    infos = al.calcular([t], HOY)
+    evs = ag.eventos(infos, date(2026, 10, 1), date(2027, 1, 31), HOY)
+    nov = ag.mes_en_pantalla(date(2026, 11, 1), evs, HOY, elegido=True)
+    dic = ag.mes_en_pantalla(date(2026, 12, 1), evs, HOY)
+    assert nov["eventos"] == 0 and not any(d["eventos"] for s in nov["semanas"] for d in s)
+    assert dic["eventos"] == 1 and nov["elegido"] and not dic["elegido"]
 
 
 def test_pdf_agenda(como, datos, pdf_legible):
@@ -124,6 +154,10 @@ def test_datos_graficos(hacer_tarea, app):
     tarjetas = {k["clave"]: k for k in d["tarjetas"]}
     assert tarjetas["pendientes"]["valor"] == 1 and tarjetas["vencidas"]["valor"] == 1
     assert tarjetas["concluidas_mes"]["valor"] == 1 and tarjetas["concluidas_mes"]["variacion"] == 0
+    # las tarjetas enlazan a la lista filtrada
+    sin_resp = Catalogo.query.filter_by(tipo="estado", valor="En instancia del MRE – Sin respuesta").one()
+    assert tarjetas["pendientes"]["filtro"] == {}
+    assert tarjetas["sin_respuesta"]["filtro"] == {"estado_id": sin_resp.id}
     assert d["cumplimiento"] == {"pct": 50, "base": 2, "meta": 80}
     vencidas = next(s for s in d["barras"]["series"] if s["alerta"] == al.VENCIDO)
     assert vencidas["valores"] == [0, 1]  # UAF, UPT

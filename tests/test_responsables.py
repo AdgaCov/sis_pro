@@ -64,6 +64,13 @@ def test_solo_admin_mueve_cargos(como, rol, sigla):
     assert c.post(f"/responsables/{m.id}/mover", data={"unidad_id": unidad("UPT").id}).status_code == 403
 
 
+def test_mover_cargo_ajeno_responde_404(como):
+    """Un cargo de otra unidad no se revela: 404, no 403."""
+    m = cargo("UPT", "Apoyo")
+    c, _ = como("unidad", "UAF")
+    assert c.post(f"/responsables/{m.id}/mover", data={"unidad_id": unidad("UAF").id}).status_code == 404
+
+
 def test_admin_mueve_cargo(como):
     m = cargo("UAF", "Mensajero")
     c, _ = como("admin")

@@ -362,6 +362,52 @@ def graficos(datos: dict, por_unidad: bool, proximos: list, alcance: str, genera
     return buf.getvalue()
 
 
+def informe_critico(datos: dict, alcance: str, generado: str) -> bytes:
+    """PDF del informe de tareas críticas. `datos` viene de services.resumen.informe_critico."""
+    buf = io.BytesIO()
+    doc = _documento(buf, "Informe de tareas críticas")
+    ancho = doc.width
+    h = [Paragraph("BOLIVIA EN EL MUNDO · INFORME DE TAREAS CRÍTICAS", E["titulo"]),
+         Paragraph(escape(f"{alcance} · {generado}"), E["sub"]), _kpis(datos["kpis"], ancho)]
+    cab = ("Código", "Tarea / asunto", "Responsable", "Límite", "Alerta", "Riesgo por demora",
+           "Línea de solución", "Plazo")
+    proporciones = (0.08, 0.22, 0.13, 0.08, 0.09, 0.16, 0.17, 0.07)
+    if not datos["grupos"]:
+        h.append(Spacer(1, 10))
+        h.append(Paragraph("No hay tareas críticas en este momento.", E["celda"]))
+    for g in datos["grupos"]:
+        filas = [[_p(c, "celda_cab") for c in cab]]
+        for i in g["items"]:
+            t = i.t
+            resp = ""
+            if t.responsable:
+                resp = t.responsable.nombre + (f"\n{t.responsable.persona}" if t.responsable.persona else "")
+            limite = formato_fecha(t.fecha_limite)
+            if i.faltan is not None:
+                limite += "\n" + (f"hace {-i.faltan} días" if i.faltan < 0 else
+                                  ("hoy" if i.faltan == 0 else f"en {i.faltan} días"))
+            asunto = t.asunto + (f"\n{t.instancia.valor}" if i.mre and t.instancia else "")
+            alerta = _chip(i.alerta) if not t.nivel_riesgo else Paragraph(
+                f'<font color="{COLOR_ALERTA.get(i.alerta, GRIS).hexval()}"><b>{escape(i.alerta)}</b></font>'
+                f"<br/>Riesgo {escape(t.nivel_riesgo.lower())}", E["celda"])
+            solucion = _p(t.linea_solucion) if t.linea_solucion else Paragraph(
+                f'<font color="{ROJO.hexval()}"><b>Sin definir</b></font>', E["celda"])
+            filas.append([_p(f"{t.codigo}\n{t.tipo.valor}"), _p(asunto), _p(resp or "Sin asignar"), _p(limite),
+                          alerta, _p(t.riesgo_demora), solucion, _p(formato_fecha(t.plazo_solucion))])
+        h.append(Paragraph(escape(f"{g['unidad'].nombre} · {len(g['items'])}"), E["h2"]))
+        h.append(_tabla(filas, [ancho * p for p in proporciones]))
+    if datos["sin_solucion"]:
+        h.append(Paragraph(escape(f"Requieren definir línea de solución ({len(datos['sin_solucion'])})"), E["h2"]))
+        for i in datos["sin_solucion"]:
+            h.append(Paragraph(escape(f"• {i.t.codigo} · {i.t.asunto[:140]}"), E["celda"]))
+    h.append(Spacer(1, 6))
+    h.append(Paragraph("Tareas abiertas vencidas, críticas (prioridad alta con muchos días desde la solicitud), "
+                       "de riesgo alto o de prioridad alta por vencer.", E["pie"]))
+    pie = f"Informe de tareas críticas · {generado}"
+    doc.build(h, onFirstPage=lambda c, d: _pie(c, d, pie), onLaterPages=lambda c, d: _pie(c, d, pie))
+    return buf.getvalue()
+
+
 # ------------------------------------------------------------------ conversión con LibreOffice
 def ruta_soffice() -> str | None:
     """Ruta del ejecutable de LibreOffice, o None si no está instalado."""

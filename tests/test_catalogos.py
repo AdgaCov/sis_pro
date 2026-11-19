@@ -90,6 +90,8 @@ def test_mover_cambia_el_orden(admin):
     assert [x.valor for x in srv.valores("prioridad")] == ["Alta", "Baja", "Media"]
     c.post(f"/admin/catalogos/{valor('prioridad', 'Alta').id}/mover", data={"direccion": "subir"})  # ya es el primero
     assert [x.valor for x in srv.valores("prioridad")] == ["Alta", "Baja", "Media"]
+    # se audita el movimiento real; el que no cambia nada no deja registro
+    assert Auditoria.query.filter_by(accion="mover_catalogo").count() == 1
 
 
 @pytest.mark.parametrize("rol,sigla", [("supervisor", None), ("unidad", "UAF"), ("invitado", None)])

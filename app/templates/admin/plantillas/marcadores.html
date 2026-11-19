@@ -20,20 +20,28 @@
     <h2 class="h6 seccion-titulo">Excel (.xlsx)</h2>
     <ul class="small">
       <li>Cualquier celda con <code>{{ '{{ resumen.total }}' }}</code> o <code>{{ '{{ unidad.nombre }}' }}</code> se reemplaza.</li>
-      <li>Una fila con marcadores <code>{{ '{{ t.xxx }}' }}</code> se repite una vez por tarea, conservando el formato.</li>
+      <li>Una fila con marcadores <code>{{ '{{ t.xxx }}' }}</code> se repite una vez por tarea, conservando el formato.
+        Igual para las otras listas, con su letra:
+        {% for letra, lista in filas_excel.items() %}<code>{{ letra }}.</code> = <code>{{ lista }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
+      <li>Las imágenes de los gráficos (<code>imagen.xxx</code>) solo funcionan en Word.</li>
       <li>Las celdas que solo tienen un número (p. ej. <code>{{ '{{ resumen.vencidas }}' }}</code>) quedan como número.</li>
     </ul>
   </div>
 </div>
 
+{% for titulo, alcances, marcadores in grupos %}
+<h2 class="h6 seccion-titulo mt-4">{{ titulo }}</h2>
+<p class="marca-sm mb-1">Sirve en: {% for a in alcances %}{{ nombres_alcance[a] }}{{ ' · ' if not loop.last }}{% endfor %}</p>
 <table class="table table-sm bg-white">
-  <thead class="table-light"><tr><th>Marcador</th><th>Contenido</th></tr></thead>
+  <thead class="table-light"><tr><th style="width: 40%">Marcador</th><th>Contenido</th></tr></thead>
   <tbody>
   {% for nombre, texto in marcadores.items() %}
     <tr><td><code>{{ nombre }}</code></td><td class="small">{{ texto }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
-<p class="small text-muted">En listas, use el nombre de la variable del <code>for</code>: <code>t.codigo</code> equivale a <code>tarea.codigo</code>
-  y <code>s.texto</code> a <code>subtarea.texto</code>. Un marcador desconocido queda vacío.</p>
+{% endfor %}
+<p class="small text-muted">En listas, use el nombre de la variable del <code>for</code>: <code>t.codigo</code> equivale a <code>tarea.codigo</code>,
+  <code>s.texto</code> a <code>subtarea.texto</code> y, por ejemplo, <code>{{ '{% for u in por_unidad %}' }}{{ '{{ u.sigla }}' }}</code>
+  a <code>fila_unidad.sigla</code>. Un marcador desconocido queda vacío.</p>
 {% endblock %}
