@@ -1,4 +1,7 @@
+import io
 import itertools
+
+import docx
 
 import pytest
 from flask import g
@@ -6,7 +9,7 @@ from flask import g
 from app import create_app
 from app.cli import cargar_catalogos
 from app.extensions import db
-from app.models import Catalogo, PermisoInvitado, Tarea, Unidad, Usuario
+from app.models import Catalogo, PermisoInvitado, Plantilla, Tarea, Unidad, Usuario
 
 CLAVE = "Clave1234"
 _contador = itertools.count(1)
@@ -103,3 +106,37 @@ def como(app, hacer_usuario):
         return c, u
 
     return _como
+
+
+@pytest.fixture
+def poner_plantilla(como):
+    """Sube como admin una plantilla Word con esos párrafos: poner_plantilla('resumen', '{{ unidad.nombre }}')."""
+    admin, _ = como("admin")
+
+    def _poner(alcance, *parrafos):
+        d = docx.Document()
+        for texto in parrafos:
+            d.add_paragraph(texto)
+        buf = io.BytesIO()
+        d.save(buf)
+        r = admin.post("/admin/plantillas/nueva", data={
+            "nombre": f"Plantilla {alcance}", "alcance": alcance, "archivo": (io.BytesIO(buf.getvalue()), f"{alcance}.docx"),
+        }, content_type="multipart/form-data")
+        assert r.status_code == 302
+        return Plantilla.query.filter_by(alcance=alcance).order_by(Plantilla.id.desc()).first()
+
+    return _poner
+
+
+@pytest.fixture
+def pdf_como_texto(monkeypatch):
+    """El «PDF» trae el texto del documento ya llenado, para buscar datos en la descarga
+    (el PDF real guarda el texto con fuentes incrustadas y no se puede buscar en los bytes)."""
+    from app.services import pdf
+
+    def convertir(datos, extension):
+        d = docx.Document(io.BytesIO(datos))
+        texto = "\n".join([x.text for x in d.paragraphs] + [c.text for t in d.tables for f in t.rows for c in f.cells])
+        return b"%PDF-texto\n" + texto.encode("utf-8")
+
+    monkeypatch.setattr(pdf, "convertir_a_pdf", convertir)

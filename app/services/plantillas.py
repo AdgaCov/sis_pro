@@ -371,13 +371,11 @@ def eliminar(actor: Usuario, p: Plantilla) -> None:
     ruta.unlink(missing_ok=True)
 
 
-def activas(alcance: str) -> list[Plantilla]:
-    return Plantilla.query.filter_by(alcance=alcance, activa=True).order_by(Plantilla.nombre).all()
-
-
-def activas_para(usuario: Usuario, alcance: str) -> list[Plantilla]:
-    """Plantillas que el usuario puede generar desde una vista: el invitado no genera documentos."""
-    return [] if usuario.es_invitado else activas(alcance)
+def vigente_para(alcance: str) -> Plantilla | None:
+    """La plantilla con la que «Descargar PDF» arma el documento de una vista: la activa editada más
+    recientemente. None si el admin todavía no subió ninguna."""
+    return (Plantilla.query.filter_by(alcance=alcance, activa=True)
+            .order_by(Plantilla.actualizado_en.desc(), Plantilla.id.desc()).first())
 
 
 # ------------------------------------------------------------------ datos para los marcadores
@@ -689,7 +687,7 @@ MIMES = {
 
 def documento(p: Plantilla, ctx: dict, formato: str) -> tuple[bytes, str]:
     """Genera el documento en el formato pedido: 'original' o 'pdf'. Devuelve (bytes, extensión)."""
-    from app.services import pdf  # evita importar LibreOffice/reportlab al cargar el módulo
+    from app.services import pdf  # reportlab se carga solo al generar un PDF
 
     datos = generar(p, ctx)
     if formato == "pdf":

@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block ancho_contenido %}ancho-form{% endblock %}
-{% from "_macros.html" import chip_alerta, menu_documentos %}
-{% macro url_doc(p, formato) %}{{ url_for('documentos.tarea', plantilla_id=p.id, tarea_id=tarea.id, formato=formato) }}{% endmacro %}
+{% from "_macros.html" import chip_alerta %}
 {% block titulo %}{{ tarea.codigo }}{% endblock %}
 {% macro dato(etiqueta, valor, ancho="col-md-6") %}
   <div class="{{ ancho }}">
@@ -20,7 +19,9 @@
     {% if tarea.prioridad %}<span class="badge text-bg-light border">Prioridad {{ tarea.prioridad.valor }}</span>{% endif %}
   </div>
   <div class="text-nowrap">
-    {{ menu_documentos(plantillas, url_doc, hay_pdf()) }}
+    {% if ficha %}<a class="btn btn-outline-primary no-imprimir"
+       href="{{ url_for('documentos.tarea', plantilla_id=ficha.id, tarea_id=tarea.id, formato='pdf') }}">
+      <i class="bi bi-file-earmark-pdf"></i> Descargar PDF</a>{% endif %}
   {% if puede_editar %}
     <a class="btn btn-primary" href="{{ url_for('tareas.editar', tarea_id=tarea.id) }}">Editar</a>
     <form class="d-inline" method="post" action="{{ url_for('tareas.eliminar', tarea_id=tarea.id) }}"

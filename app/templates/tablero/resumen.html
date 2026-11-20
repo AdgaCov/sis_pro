@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis, filtros, menu_documentos %}
-{% macro url_doc(p, formato) %}{{ url_for('documentos.resumen_ejecutivo', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
+{% from "_macros.html" import kpis, filtros %}
 {% block titulo %}Resumen ejecutivo{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
@@ -9,8 +8,7 @@
     <p class="text-muted">Solicitudes, autorizaciones y gestiones con el MRE. Las tareas internas no se incluyen.</p>
   </div>
   <div class="text-nowrap">
-    <a class="btn btn-primary btn-sm no-imprimir" href="{{ url_for('tablero.resumen_pdf', **request.args) }}">Descargar PDF</a>
-    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+    {% if plantilla_pdf %}<a class="btn btn-primary btn-sm no-imprimir" href="{{ url_for('tablero.resumen_pdf', **request.args) }}">Descargar PDF</a>{% endif %}
   </div>
 </div>
 <p class="solo-imprimir small">Generado el {{ ahora|fecha_hora }} por {{ current_user.nombre_usuario }}</p>
@@ -62,7 +60,7 @@
 
 <section>
   <h2 class="h6 seccion-titulo">Detalle consolidado <span class="text-muted fw-normal">· {{ detalle|length }} gestiones</span></h2>
-  <p class="small text-muted no-imprimir">El PDF incluye los indicadores, los cuadros y el detalle con los filtros que aplique aquí.</p>
+  {% if plantilla_pdf %}<p class="small text-muted no-imprimir">El PDF usa la plantilla del resumen: los indicadores y cuadros con todo lo visible y el detalle con los filtros que aplique aquí.</p>{% endif %}
   {{ filtros(filtro, ['texto', 'unidad_id', 'tipo_id', 'instancia_id', 'area_id', 'alerta', 'ver_concluidas'],
              url_for('tablero.resumen_ejecutivo'), varias_unidades) }}
   {% with infos=detalle, con_unidad=True, vacio='Sin gestiones con el MRE para mostrar.' %}

@@ -54,9 +54,10 @@ Es la migración de una app en Google Apps Script (ver `referencias/`) a Python.
 - Flask-SQLAlchemy, Flask-Migrate (Alembic), PyMySQL → MariaDB 10.6+
 - Flask-Login (sesiones), Flask-WTF (formularios + CSRF), python-dotenv
 - Jinja2 + Bootstrap 5 (sin frameworks JS; JS mínimo en `static/js/`)
-- `reportlab` para los PDF propios (resumen ejecutivo, agenda, tablero con gráficos); no requiere LibreOffice
+- Todos los PDF salen de las plantillas que sube el admin (no hay PDF propio del sistema). La conversión Word/Excel → PDF
+  es Python puro (`services/pdf.py`: python-docx/openpyxl leen, `reportlab` dibuja); **no se usa LibreOffice ni Word**
 - Chart.js 4.4.1 (CDN) solo en la vista Gráficos: única excepción a «sin frameworks JS»
-- Plantillas: `docxtpl` (Word) y `openpyxl` (Excel); PDF de plantillas con LibreOffice headless
+- Plantillas: `docxtpl` (Word) y `openpyxl` (Excel); su PDF con `services/pdf.py` (reportlab)
 - Tests: pytest (SQLite en memoria; `TEST_DATABASE_URL` para usar otra base)
 
 ## Idioma y estilo
@@ -77,7 +78,6 @@ seg_pro/
 ├── storage/               # fuera de static/, no se sirve directo
 │   ├── respaldos/<SIGLA>/<id_tarea>/   # adjuntos
 │   ├── plantillas/                     # plantillas subidas (<uuid>.docx|xlsx)
-│   └── generados/                      # temporales de LibreOffice, se borran siempre
 ├── tests/
 └── app/
     ├── __init__.py        # create_app(), blueprints, filtros |fecha y |fecha_hora, errores
@@ -107,7 +107,7 @@ seg_pro/
 | `/agenda` · `/agenda/agenda.pdf` | todos | Agenda Despacho del mes (`?mes=AAAA-MM`) y su PDF |
 | `/tablero/graficos` · `/tablero/graficos.pdf` | todos | Tablero con gráficos y su PDF |
 | `/tablero/alertas` · `/informe` · `/informe.pdf` · `/cronograma` | admin, supervisor, unidad | Vistas del tablero (el informe crítico, con su PDF) |
-| `/documentos/<plantilla>/{tarea/<id>, listado, informe, resumen, agenda, graficos}` | admin, supervisor, unidad | Generar documento (`?formato=original\|pdf`) |
+| `/documentos/<plantilla>/{tarea/<id>, listado, informe, resumen, agenda, graficos}` | admin, supervisor, unidad | Llena la plantilla (`?formato=original\|pdf`); la interfaz siempre pide PDF |
 | `/admin/{usuarios, invitados, plantillas, catalogos}` | admin | Administración |
 
 ## Roles y permisos
@@ -128,10 +128,11 @@ Cada persona tiene su propio usuario y contraseña, ligado a una unidad (salvo a
 - Siempre debe existir al menos un admin activo.
 
 ### Invitado
-Solo ve tres vistas (`VISTAS_INVITADO` en `models/permiso_invitado.py`), cada una con su PDF:
+Solo ve tres vistas (`VISTAS_INVITADO` en `models/permiso_invitado.py`), cada una con su PDF (la plantilla del admin):
 **resumen ejecutivo**, **agenda** y **gráficos**. En las tres ve solo gestiones con el MRE (nunca tareas internas;
 `permisos.solo_gestiones_mre`) y sin enlaces al detalle de las tareas.
-No ve tareas, alertas, informe, cronograma, responsables, adjuntos ni genera documentos de plantillas.
+No ve tareas, alertas, informe, cronograma, responsables ni adjuntos; de las plantillas solo descarga las de sus tres vistas,
+llenadas con los mismos datos filtrados que ve en pantalla.
 Tabla `permiso_invitado` por usuario invitado: unidades permitidas (`todas_unidades` o una lista). Sin unidades no ve datos.
 Se configura en Admin › Invitados. Cada descarga de PDF (de cualquier usuario) queda en la auditoría (`descargar_pdf`).
 
@@ -185,7 +186,7 @@ Sección propia de la app (ya no se conecta con Google Sheets). Se arma con los 
 - En pantalla, tres calendarios (lunes a domingo): mes anterior, el elegido (al centro, con los indicadores) y el siguiente;
   cada día coloreado con su peor alerta y el código de cada evento (detalle en el tooltip); navegación por mes; «Próximos 14 días».
 - Estado de agenda (como la app original): Concluido → Concluida, Pendiente → Pendiente, Observado / Devuelto → Bloqueada, el resto → En gestión.
-- Filtros: unidad y responsable. PDF del mes: indicadores y eventos día por día.
+- Filtros: unidad y responsable. PDF del mes: la plantilla de alcance `agenda`.
 
 ### Gráficos (`services/graficos.py`, `static/js/graficos.js`)
 Un gráfico por pregunta. Los datos los arma el servidor (ya filtrados por permisos) y se pasan como JSON en la página:
@@ -202,23 +203,35 @@ Un gráfico por pregunta. Los datos los arma el servidor (ya filtrados por permi
 
 - Colores de alerta en 4 familias: rojo (vencido/crítico), ámbar (por vencer/seguimiento), azul (en curso), gris (sin fecha); verde = concluido/cumple.
 - Al pulsar un gráfico se abre la lista de tareas ya filtrada (solo si el usuario puede ver tareas; el invitado no).
-- PDF con los mismos bloques dibujados con `reportlab.graphics` (sin JS).
+- PDF: la plantilla de alcance `graficos` (en Word, los gráficos van como imagen con `{{ imagen.* }}`).
 - «Cuántas vencidas había cada día» no se puede graficar porque las alertas no se guardan; si se necesita, haría falta una tabla `foto_diaria` y un comando nocturno.
 
 ## Plantillas con marcadores (Admin › Plantillas)
 El admin sube `.docx` o `.xlsx` (máx. 10 MB) a `storage/plantillas/` e indica su **alcance**: `tarea` (ficha), `listado` (lo que muestra el filtro),
 `informe` (solo tareas críticas), `resumen` (resumen ejecutivo), `agenda` (Agenda Despacho del mes) o `graficos` (tablero; también desde el Inicio).
-Los PDF propios (reportlab) siguen igual; la plantilla es una descarga adicional en «Generar documento» de cada vista.
+**Solo se descargan las plantillas que sube el admin**, siempre en PDF. Cada vista tiene un solo botón «Descargar PDF»
+(no hay menú «Generar documento» ni PDF propio del sistema), y aparece solo si hay una plantilla activa de ese alcance
+(la editada más recientemente, `plantillas.vigente_para`). Las rutas `*.pdf` (`documentos.descargar_pdf`) redirigen a
+`/documentos/...?formato=pdf`; sin plantilla vuelven a la vista con un aviso.
+La ficha también tiene botón por fila en Tareas. El invitado descarga las de sus tres vistas (los permisos de cada ruta lo validan).
 - Word: `docxtpl` con `jinja2.sandbox.SandboxedEnvironment` y autoescape. Listas con `{% for t in tareas %}…{% endfor %}`; en tablas, `{%tr for t in tareas %}` repite la fila.
 - Excel: `openpyxl`, reemplaza `{{ marcador }}` en celdas; una fila con marcadores `{{ t.xxx }}` se repite por cada tarea conservando el formato.
   Otras listas con su letra (`FILAS_EXCEL`): `u.` por_unidad, `i.` por_instancia, `p.` por_tipo, `e.` eventos, `m.` mensual, `f.` embudo.
   Una celda con un solo marcador numérico queda como número. Las fórmulas debajo de la fila repetida no se ajustan.
 - Gráficos en Word: `{{ imagen.barras }}`, `{{ imagen.cumplimiento }}`, `{{ imagen.mensual }}`, `{{ imagen.embudo }}` → PNG dibujados con Pillow (`services/imagenes.py`, fuente Vera de reportlab).
 - Al subir: se validan los marcadores contra `MARCADORES` (en `services/plantillas.py`, visible en Admin › Plantillas › Marcadores) y se listan los desconocidos (quedan vacíos al generar). Una sintaxis inválida rechaza el archivo. Botón «Probar» con datos de ejemplo.
-- Se generan desde «Generar documento»: ficha (detalle de tarea), listado (Tareas, con los filtros), informe (Informe crítico),
-  resumen, agenda (mes elegido) y gráficos (Gráficos e Inicio), con los permisos y filtros de cada vista. El invitado no genera documentos.
+- Se descargan con «Descargar PDF»: ficha (detalle de tarea), listado (Tareas, con los filtros), informe (Informe crítico),
+  resumen, agenda (mes elegido) y gráficos (Gráficos e Inicio), con los permisos y filtros de cada vista. El invitado solo resumen, agenda y gráficos.
 - Los marcadores están agrupados por documento en `GRUPOS_MARCADORES` (Admin › Plantillas › Marcadores).
-- Salida: el mismo formato o PDF con LibreOffice (`soffice --headless --convert-to pdf`, perfil propio, tiempo límite `SOFFICE_TIMEOUT`, temporales en `storage/generados/` que se borran siempre). Sin LibreOffice solo se ofrece el formato original; `SOFFICE_PATH` en `.env` indica su ruta.
+- Salida: PDF dibujado en Python (`pdf.convertir_a_pdf`); `?formato=original` (Word/Excel) queda solo para pruebas.
+  Word: fuentes, negrita/cursiva/subrayado, colores, tamaños, alineación, sangrías, espaciado, «conservar con el siguiente»,
+  viñetas y numeración, tablas (anchos, celdas combinadas, fondos, bordes, filas de encabezado), imágenes, saltos de página,
+  encabezado y pie (tabuladores a la derecha/centro y nº de página «Página X de Y»).
+  Excel: cada hoja visible en su página, anchos/altos, combinadas, fondos, bordes, fuente, alineación, formatos de número;
+  se ajusta al ancho (horizontal si conviene). Fórmulas: solo sencillas (FILA, SUMA, CONTAR, PROMEDIO, MIN, MAX, REDONDEAR,
+  + − × ÷ con celdas); las demás quedan vacías.
+  **No se dibujan:** gráficos e imágenes de Excel, formas y cuadros de texto de Word, imágenes EMF/WMF. Para gráficos use
+  Word con `{{ imagen.* }}`. Fuentes: las del sistema (Calibri, Arial…; en Linux Carlito/Liberation) o Vera de reportlab.
 
 La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la guía de cada documento.
 
@@ -231,7 +244,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
 2. Admin › Plantillas › Nueva: nombre, alcance (el documento que es) y el archivo `.docx` o `.xlsx`.
 3. Si aparece «Marcadores desconocidos», hay un nombre mal escrito: quedará vacío. Corríjalo y vuelva a subir el archivo
    (Editar). Una sintaxis inválida (`{{` sin cerrar, `{% for %}` sin `endfor`) rechaza el archivo.
-4. «Probar» lo llena con datos de ejemplo. Luego se descarga desde la vista con «Generar documento» (Word/Excel o PDF).
+4. «Probar» lo llena con datos de ejemplo. Luego se descarga en PDF desde la vista con «Descargar PDF».
    El archivo se llama `<nombre de la plantilla>_<código, AAAAMMDD o AAAA_MM>.docx|xlsx|pdf`.
 
 #### Reglas comunes
@@ -277,7 +290,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
 `s.hecho` = Sí/No).
 
 #### 1. Ficha de una tarea — alcance `tarea`
-- **Se descarga en:** detalle de la tarea › Generar documento. **Trae:** esa tarea (`tareas` tiene solo esa).
+- **Se descarga en:** detalle de la tarea › Descargar PDF (o el botón PDF de cada fila de Tareas). **Trae:** esa tarea (`tareas` tiene solo esa).
 - **Use:** `tarea.xxx` (todos los campos de arriba), `tarea.subtareas`, `unidad.*`, `generado.*`.
 - **Word:** título `Ficha {{ tarea.codigo }}`; tabla de 2 columnas con etiqueta y dato (`Asunto | {{ tarea.asunto }}`,
   `Responsable | {{ tarea.responsable }} ({{ tarea.persona }})`, `Fecha límite | {{ tarea.fecha_limite }}`,
@@ -286,7 +299,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
   una celda con `{% for s in tarea.subtareas %}{{ s.texto }} ({{ s.hecho }}); {% endfor %}`.
 
 #### 2. Listado — alcance `listado`
-- **Se descarga en:** Tareas › Generar documento. **Trae:** exactamente lo que muestra el filtro (todas las páginas),
+- **Se descarga en:** Tareas › Descargar PDF. **Trae:** exactamente lo que muestra el filtro (todas las páginas),
   de la más grave a la menos grave; sin «Ver concluidas», solo abiertas.
 - **Use:** `tareas` con `t.xxx`, `resumen.*` (conteos del listado), `unidad.*`, `generado.filtros` (p. ej.
   «Unidad: UAF · Alerta: VENCIDO · solo abiertas»).
@@ -298,7 +311,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
 - No use `tarea.xxx` aquí: es solo la primera de la lista.
 
 #### 3. Informe crítico — alcance `informe`
-- **Se descarga en:** Informe crítico › Generar documento (además del «Descargar PDF» fijo). **Trae:** solo tareas
+- **Se descarga en:** Informe crítico › Descargar PDF. **Trae:** solo tareas
   críticas abiertas (vencidas, críticas, riesgo alto o alta prioridad por vencer), filtradas por unidad.
 - **Use:** `tareas` con `t.xxx` — sobre todo `t.alerta`, `t.nivel_riesgo`, `t.riesgo_demora`, `t.solucion`,
   `t.plazo_solucion`, `t.responsable`, `t.persona`, `t.faltan` —, `resumen.criticas`, `resumen.sin_solucion`, `unidad.*`.
@@ -307,7 +320,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
 - **Excel:** fila repetida `{{ t.codigo }} | {{ t.unidad }} | {{ t.asunto }} | {{ t.alerta }} | {{ t.riesgo_demora }} | {{ t.solucion }} | {{ t.plazo_solucion }}`.
 
 #### 4. Resumen ejecutivo — alcance `resumen`
-- **Se descarga en:** Resumen › Generar documento. **Trae:** solo gestiones con el MRE (nunca tareas internas).
+- **Se descarga en:** Resumen › Descargar PDF. **Trae:** solo gestiones con el MRE (nunca tareas internas).
   Como en la pantalla, los indicadores y cuadros cuentan **todo lo visible**; los filtros solo cambian `tareas` (el detalle).
 
 | Marcador | Qué trae |
@@ -326,7 +339,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
   Cada fila repetida empuja hacia abajo lo que está debajo. Para un gráfico de Excel, apúntelo a la columna de `u.pendientes`.
 
 #### 5. Agenda Despacho — alcance `agenda`
-- **Se descarga en:** Agenda › Generar documento. **Trae:** el mes elegido en pantalla (el del centro), con los filtros
+- **Se descarga en:** Agenda › Descargar PDF del mes. **Trae:** el mes elegido en pantalla (el del centro), con los filtros
   de unidad y responsable.
 
 | Marcador | Qué trae |
@@ -341,7 +354,7 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
   Use el formato condicional de Excel sobre la columna de `e.alerta` para colorear las vencidas.
 
 #### 6. Tablero con gráficos — alcance `graficos`
-- **Se descarga en:** Gráficos o Inicio › Generar documento. **Trae:** lo mismo que dibuja la pantalla (con el filtro de unidad).
+- **Se descarga en:** Gráficos o Inicio › Descargar PDF. **Trae:** lo mismo que dibuja la pantalla (con el filtro de unidad).
 
 | Marcador | Qué trae |
 |---|---|
@@ -366,8 +379,8 @@ La lista completa está en `MARCADORES` (`services/plantillas.py`); abajo, la gu
   debajo: las filas repetidas bajan el contenido, pero el gráfico queda fijo y lo taparían.
 
 ## Configuración (`config.py` y `.env`)
-- `.env`: `APP_CONFIG`, `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE`, `SOFFICE_PATH` (opcional), `STORAGE_DIR` (opcional).
-- `config.py`: sesión y bloqueo (`HORAS_SESION`, `MAX_INTENTOS`, `MINUTOS_BLOQUEO`), umbrales de alertas, `META_CUMPLIMIENTO`, `MAX_MB_ADJUNTO`, `EXTENSIONES_ADJUNTO`, `TAREAS_POR_PAGINA`, `SOFFICE_TIMEOUT`.
+- `.env`: `APP_CONFIG`, `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE`, `STORAGE_DIR` (opcional).
+- `config.py`: sesión y bloqueo (`HORAS_SESION`, `MAX_INTENTOS`, `MINUTOS_BLOQUEO`), umbrales de alertas, `META_CUMPLIMIENTO`, `MAX_MB_ADJUNTO`, `EXTENSIONES_ADJUNTO`, `TAREAS_POR_PAGINA`.
 
 ## Comandos
 ```

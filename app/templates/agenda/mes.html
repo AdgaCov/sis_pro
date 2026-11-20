@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import kpis as indicadores, filtros, chip_alerta, enlace_tarea, menu_documentos %}
-{% macro url_doc(p, formato) %}{{ url_for('documentos.agenda_mes', plantilla_id=p.id, formato=formato, mes=mes.strftime('%Y-%m'), **args) }}{% endmacro %}
+{% from "_macros.html" import kpis as indicadores, filtros, chip_alerta, enlace_tarea %}
 {% block titulo %}Agenda Despacho{% endblock %}
 {% macro evento(e) %}
   {% set t = e.info.t %}
@@ -17,8 +16,7 @@
       {% if solo_mre %}Solo gestiones con el MRE.{% endif %}</p>
   </div>
   <div class="text-nowrap">
-    <a class="btn btn-primary btn-sm" href="{{ url_for('agenda.mes_pdf', mes=mes.strftime('%Y-%m'), **args) }}">Descargar PDF del mes</a>
-    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+    {% if plantilla_pdf %}<a class="btn btn-primary btn-sm" href="{{ url_for('agenda.mes_pdf', mes=mes.strftime('%Y-%m'), **args) }}">Descargar PDF del mes</a>{% endif %}
   </div>
 </div>
 

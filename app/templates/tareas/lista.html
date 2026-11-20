@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import filtros, menu_documentos %}
-{% macro url_doc(p, formato) %}{{ url_for('documentos.listado', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
+{% from "_macros.html" import filtros %}
 {% block titulo %}Tareas{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -9,7 +8,9 @@
     <p class="small text-muted mb-0">Ordenadas por alerta: primero las vencidas y críticas.</p>
   </div>
   <div class="text-nowrap">
-    {{ menu_documentos(plantillas, url_doc, hay_pdf()) }}
+    {% if plantilla_listado %}<a class="btn btn-outline-primary"
+       href="{{ url_for('documentos.listado', plantilla_id=plantilla_listado.id, **dict(request.args, formato='pdf')) }}">
+      <i class="bi bi-file-earmark-pdf"></i> Descargar PDF</a>{% endif %}
     {% if puede_crear %}<a class="btn btn-primary" href="{{ url_for('tareas.nueva') }}">Nueva tarea</a>{% endif %}
   </div>
 </div>
@@ -18,7 +19,7 @@
            url_for('tareas.lista'), filtro.unidad_id.choices|length > 2) }}
 
 {% with infos=pagina.items, con_unidad=filtro.unidad_id.choices|length > 2, ver_tareas=True,
-        vacio='No hay tareas con estos filtros.' %}
+        vacio='No hay tareas con estos filtros.', ficha=ficha %}
   {% include "tablero/_tabla_tareas.html" %}
 {% endwith %}
 

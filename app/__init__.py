@@ -18,7 +18,7 @@ def create_app(nombre_config: str | None = None) -> Flask:
     if not app.config.get("SQLALCHEMY_DATABASE_URI"):
         raise RuntimeError("Falta DATABASE_URL en el archivo .env")
 
-    for sub in ("respaldos", "plantillas", "generados"):
+    for sub in ("respaldos", "plantillas"):
         (app.config["STORAGE_DIR"] / sub).mkdir(parents=True, exist_ok=True)
 
     db.init_app(app)
@@ -92,7 +92,7 @@ def _registrar_blueprints(app: Flask) -> None:
 
 def _registrar_plantillas(app: Flask) -> None:
     from app.models.usuario import NOMBRES_ROL
-    from app.services import pdf, permisos
+    from app.services import permisos
     from app.utils.fechas import ahora_utc, formato_fecha, formato_fecha_hora
 
     app.add_template_filter(formato_fecha, "fecha")
@@ -100,8 +100,7 @@ def _registrar_plantillas(app: Flask) -> None:
 
     @app.context_processor
     def contexto():
-        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista, "ahora": ahora_utc(),
-                "hay_pdf": pdf.libreoffice_disponible}
+        return {"NOMBRES_ROL": NOMBRES_ROL, "puede_ver_vista": permisos.puede_ver_vista, "ahora": ahora_utc()}
 
 
 def _registrar_errores(app: Flask) -> None:

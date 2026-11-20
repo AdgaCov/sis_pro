@@ -1,4 +1,7 @@
-"""Generación de documentos desde plantillas. Los invitados no tienen acceso."""
+"""Documentos de cada vista: las plantillas que sube el admin, llenadas con los datos que el usuario puede ver.
+
+El invitado solo llega a las vistas que puede ver (resumen, agenda, gráficos); cada ruta lo valida con
+`puede_ver_vista` y los datos salen de los mismos filtros de permisos que la pantalla."""
 import io
 
 from flask import Blueprint, abort, flash, redirect, request, send_file, url_for
@@ -14,10 +17,16 @@ from app.utils.fechas import a_local, ahora_utc, hoy_local
 bp = Blueprint("documentos", __name__, url_prefix="/documentos")
 
 
-@bp.before_request
-def _sin_invitados():
-    if current_user.is_authenticated and current_user.es_invitado:
-        abort(403)
+def descargar_pdf(alcance: str, endpoint: str, vista: str):
+    """«Descargar PDF» de una vista: llena la plantilla que subió el admin para ese documento y la entrega en PDF.
+    Si todavía no hay plantilla, vuelve a la vista con un aviso (no hay PDF propio del sistema)."""
+    args = {k: v for k, v in request.args.items() if k != "formato"}
+    p = srv.vigente_para(alcance)
+    if p is None:
+        flash("Todavía no hay una plantilla para este documento. Planificación puede subirla en "
+              "Administración › Plantillas.", "warning")
+        return redirect(url_for(vista, **args))
+    return redirect(url_for(endpoint, plantilla_id=p.id, formato="pdf", **args))
 
 
 def _plantilla(plantilla_id: int, alcance: str) -> Plantilla:
@@ -35,7 +44,7 @@ def _entregar(p: Plantilla, ctx: dict, sufijo: str, volver: str):
         db.session.rollback()
         flash(str(e), "danger")
         return redirect(volver)
-    auditoria.registrar("generar_documento", current_user, "plantilla", p.id,
+    auditoria.registrar("descargar_pdf" if ext == "pdf" else "generar_documento", current_user, "plantilla", p.id,
                         {"plantilla": p.nombre, "formato": ext, "tareas": len(ctx["tareas"])})
     db.session.commit()
     return send_file(io.BytesIO(datos), as_attachment=True, mimetype=srv.MIMES[ext],

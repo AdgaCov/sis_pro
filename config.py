@@ -44,8 +44,6 @@ class Config:
     }
     TAREAS_POR_PAGINA = 50
     STORAGE_DIR = Path(os.getenv("STORAGE_DIR", BASE_DIR / "storage"))
-    SOFFICE_PATH = os.getenv("SOFFICE_PATH", "soffice")
-    SOFFICE_TIMEOUT = 60
 
     WTF_CSRF_TIME_LIMIT = None  # el token vive lo que dura la sesión
 

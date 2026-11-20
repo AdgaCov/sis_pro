@@ -236,31 +236,36 @@ def test_detalle_muestra_alerta_y_senales(como, tarea):
     assert "VENCIDO" in html and "Sin responsable" in html
 
 
-# ------------------------------------------------------------------ PDF del informe crítico
+# ------------------------------------------------------------------ PDF del informe crítico (plantilla del admin)
 @pytest.fixture
-def pdf_legible(monkeypatch):
-    from reportlab import rl_config
+def plantilla_informe(poner_plantilla, pdf_como_texto):
+    return poner_plantilla("informe", "{{ resumen.criticas }} críticas",
+                           "{% for t in tareas %}[{{ t.codigo }} {{ t.solucion or 'Sin definir' }}]{% endfor %}")
 
-    monkeypatch.setattr(rl_config, "pageCompression", 0)
 
-
-def test_informe_critico_se_descarga_en_pdf(como, tarea, pdf_legible):
+def test_informe_critico_se_descarga_en_pdf(como, tarea, plantilla_informe):
     from app.models import Auditoria
 
     _datos_de_prueba(tarea)  # una vencida en UAF y otra en UPT
     c, _ = como("admin")
     assert "/tablero/informe.pdf" in c.get("/tablero/informe").get_data(as_text=True)
-    r = c.get("/tablero/informe.pdf")
+    r = c.get("/tablero/informe.pdf", follow_redirects=True)
     assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF")
-    assert "Informe_Critico_" in r.headers["Content-Disposition"]
+    assert "Plantilla_informe_" in r.headers["Content-Disposition"]
     assert b"UAF-001" in r.data and b"UPT-001" in r.data and b"Sin definir" in r.data
-    assert Auditoria.query.filter_by(accion="descargar_pdf", entidad="informe").count() == 1
+    assert Auditoria.query.filter_by(accion="descargar_pdf", entidad="plantilla").count() == 1
 
 
-def test_informe_pdf_respeta_unidad_y_permisos(como, tarea, pdf_legible):
+def test_informe_pdf_respeta_unidad_y_permisos(como, tarea, plantilla_informe):
     _datos_de_prueba(tarea)
     c, _ = como("unidad", "UAF")
-    r = c.get("/tablero/informe.pdf")
+    r = c.get("/tablero/informe.pdf", follow_redirects=True)
     assert b"UAF-001" in r.data and b"UPT-001" not in r.data  # la unidad no ve otra unidad
     inv, _ = como("invitado", permisos={"todas_unidades": True})
     assert inv.get("/tablero/informe.pdf").status_code == 403  # el invitado no ve el informe
+
+
+def test_informe_sin_plantilla_no_ofrece_pdf(como, tarea):
+    c, _ = como("admin")
+    assert "/tablero/informe.pdf" not in c.get("/tablero/informe").get_data(as_text=True)
+    assert c.get("/tablero/informe.pdf").status_code == 302

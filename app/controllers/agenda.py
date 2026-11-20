@@ -1,12 +1,12 @@
-from flask import Blueprint, abort, make_response, render_template, request
+from flask import Blueprint, abort, render_template, request
 from flask_login import current_user
 
+from app.controllers.documentos import descargar_pdf
 from app.controllers.tareas import formulario_filtros
-from app.extensions import db
 from app.services import agenda as srv
-from app.services import auditoria, pdf, permisos, resumen
-from app.services import plantillas as srv_plantillas
-from app.utils.fechas import ahora_utc, formato_fecha_hora, hoy_local
+from app.services import permisos, resumen
+from app.services.plantillas import vigente_para
+from app.utils.fechas import hoy_local
 
 bp = Blueprint("agenda", __name__, url_prefix="/agenda")
 
@@ -44,31 +44,11 @@ def mes():
         ver_tareas=permisos.puede_ver_vista(current_user, "tareas"),
         varias_unidades=len(permisos.unidades_visibles(current_user)) > 1,
         solo_mre=permisos.solo_gestiones_mre(current_user),
-        plantillas=srv_plantillas.activas_para(current_user, "agenda"),
+        plantilla_pdf=vigente_para("agenda"),
     )
 
 
 @bp.route("/agenda.pdf")
 def mes_pdf():
-    filtro = formulario_filtros()
-    hoy = hoy_local()
-    mes_ = srv.leer_mes(request.args.get("mes"), hoy)
-    infos = _infos(filtro)
-    fin = srv.mes_vecino(mes_, 1)
-    evs = [e for e in srv.eventos(infos, mes_, fin, hoy) if e["fecha"] < fin]
-    unidades = permisos.unidades_visibles(current_user)
-    if filtro.unidad_id.data:
-        unidades = [u for u in unidades if u.id == filtro.unidad_id.data]
-    alcance = "Unidades: " + (", ".join(u.sigla for u in unidades) or "ninguna")
-    if permisos.solo_gestiones_mre(current_user):
-        alcance += " · solo gestiones con el MRE"
-    generado = f"Generado el {formato_fecha_hora(ahora_utc())} por {current_user.nombre_usuario}"
-    contenido = pdf.agenda(srv.nombre_mes(mes_), srv.por_dia(evs), srv.resumen(evs, hoy), alcance, generado)
-
-    auditoria.registrar("descargar_pdf", current_user, "agenda", None, {"mes": f"{mes_:%Y-%m}", "eventos": len(evs)})
-    db.session.commit()
-    resp = make_response(contenido)
-    resp.headers["Content-Type"] = "application/pdf"
-    resp.headers["Content-Disposition"] = f'attachment; filename="Agenda_Despacho_{mes_:%Y_%m}.pdf"'
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    """La plantilla de la agenda que subió el admin, en PDF (mes y filtros de la pantalla)."""
+    return descargar_pdf("agenda", "documentos.agenda_mes", "agenda.mes")

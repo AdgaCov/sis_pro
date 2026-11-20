@@ -8,7 +8,7 @@ from app.forms.plantillas import PlantillaForm
 from app.forms.usuarios import AccionForm
 from app.models import Plantilla
 from app.models.usuario import ROL_ADMIN
-from app.services import ErrorNegocio, pdf
+from app.services import ErrorNegocio
 from app.services import plantillas as srv
 from app.utils.decoradores import rol_requerido
 
@@ -37,8 +37,7 @@ def _avisar_desconocidos(p: Plantilla) -> None:
 @bp.route("")
 def lista():
     plantillas = Plantilla.query.order_by(Plantilla.alcance, Plantilla.nombre).all()
-    return render_template("admin/plantillas/lista.html", plantillas=plantillas, accion=AccionForm(),
-                           hay_libreoffice=pdf.libreoffice_disponible())
+    return render_template("admin/plantillas/lista.html", plantillas=plantillas, accion=AccionForm())
 
 
 @bp.route("/marcadores")

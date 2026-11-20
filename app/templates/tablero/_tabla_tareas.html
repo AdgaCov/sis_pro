@@ -1,5 +1,6 @@
-{# Tabla de tareas con alertas. Variables: infos (InfoTarea), con_unidad, ver_tareas, vacio #}
-{% from "_macros.html" import chip_alerta, enlace_tarea, responsable %}
+{# Tabla de tareas con alertas. Variables: infos (InfoTarea), con_unidad, ver_tareas, vacio,
+   ficha (opcional: plantilla de alcance «tarea»; agrega la columna «Descargar PDF» por fila) #}
+{% from "_macros.html" import chip_alerta, enlace_tarea, responsable, boton_ficha %}
 <div class="table-responsive">
 <table class="table table-sm table-hover align-middle bg-white tabla-tareas">
   <thead class="table-light">
@@ -7,6 +8,7 @@
       {% if con_unidad %}<th>Unidad</th>{% endif %}
       <th>Código</th><th>Tipo</th><th>Tarea / asunto</th><th>Instancia MRE</th><th>Responsable</th>
       <th>Inicio</th><th>Límite</th><th>Estado</th><th>Prioridad</th><th>Alerta</th><th>Resultado</th>
+      {% if ficha %}<th class="no-imprimir"><span class="visually-hidden">Ficha</span></th>{% endif %}
     </tr>
   </thead>
   <tbody>
@@ -41,9 +43,10 @@
         {% if t.fecha_conclusion %}<br><span class="marca-sm">{{ t.fecha_conclusion|fecha }}</span>{% endif %}
         {% if i.sin_respaldo %}<br><span class="chip a-POR-VENCER">Sin medio de verificación</span>{% endif %}
       </td>
+      {% if ficha %}<td class="no-imprimir text-end">{{ boton_ficha(t, ficha) }}</td>{% endif %}
     </tr>
   {% else %}
-    <tr><td colspan="12" class="text-center text-muted py-4">{{ vacio }}</td></tr>
+    <tr><td colspan="{{ 12 + (1 if con_unidad else 0) + (1 if ficha else 0) }}" class="text-center text-muted py-4">{{ vacio }}</td></tr>
   {% endfor %}
   </tbody>
 </table>

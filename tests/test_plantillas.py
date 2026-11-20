@@ -1,6 +1,6 @@
 """Etapa 5: plantillas Word/Excel con marcadores, validación, generación y PDF."""
 import io
-import subprocess
+import re
 from datetime import timedelta
 
 import docx
@@ -253,58 +253,181 @@ def test_sandbox_bloquea_codigo_peligroso(admin, con_tareas):
     assert "No se pudo llenar" in admin.get(r.headers["Location"]).get_data(as_text=True)
 
 
-def test_menu_generar_documento(como, admin, con_tareas):
+def test_tareas_descargan_pdf_con_la_plantilla(como, admin, con_tareas):
+    c, _ = como("unidad", "UAF")
+    assert "Descargar PDF" not in c.get(f"/tareas/{con_tareas[0].id}").get_data(as_text=True)  # sin plantilla
     subir(admin, word("{{ tarea.codigo }}"), "ficha.docx")
     subir(admin, excel(), "listado.xlsx", alcance="listado", titulo="Listado")
-    c, _ = como("unidad", "UAF")
-    assert "Generar documento" in c.get(f"/tareas/{con_tareas[0].id}").get_data(as_text=True)
-    assert "/documentos/" in c.get("/tareas").get_data(as_text=True)
+    ficha, listado = Plantilla.query.order_by(Plantilla.id).all()
+    detalle = c.get(f"/tareas/{con_tareas[0].id}").get_data(as_text=True)
+    assert f"/documentos/{ficha.id}/tarea/{con_tareas[0].id}?formato=pdf" in detalle
+    assert "Generar documento" not in detalle and "formato=original" not in detalle
+    lista = c.get("/tareas?alerta=VENCIDO").get_data(as_text=True)
+    assert f"/documentos/{listado.id}/listado?alerta=VENCIDO&amp;formato=pdf" in lista
+    assert "Generar documento" not in lista
 
 
-# ------------------------------------------------------------------ PDF con LibreOffice
-def test_pdf_sin_libreoffice(admin, con_tareas, app):
-    app.config["SOFFICE_PATH"] = "no-existe-soffice"
+def test_usa_la_plantilla_editada_mas_recientemente(admin, con_tareas):
+    subir(admin, word("{{ tarea.codigo }}"), "a.docx", titulo="Vieja")
+    subir(admin, word("{{ tarea.codigo }}"), "b.docx", titulo="Nueva")
+    nueva = Plantilla.query.filter_by(nombre="Nueva").one()
+    assert f"/documentos/{nueva.id}/tarea/" in admin.get(f"/tareas/{con_tareas[0].id}").get_data(as_text=True)
+
+
+def test_listado_ofrece_ficha_pdf_por_tarea(admin, con_tareas):
+    # sin plantilla de ficha no hay botón por fila
+    assert "Descargar ficha de" not in admin.get("/tareas").get_data(as_text=True)
     subir(admin, word("{{ tarea.codigo }}"), "ficha.docx")
     p = Plantilla.query.one()
-    r = admin.get(f"/documentos/{p.id}/tarea/{con_tareas[0].id}?formato=pdf")
-    assert r.status_code == 302
-    assert "LibreOffice no está instalado" in admin.get(r.headers["Location"]).get_data(as_text=True)
+    t = con_tareas[0]
+    html = admin.get("/tareas").get_data(as_text=True)
+    assert f"/documentos/{p.id}/tarea/{t.id}?formato=pdf" in html  # siempre PDF, nunca el .docx
+    assert "formato=original" not in html.split("<tbody>")[1]
+    assert "Descargar ficha de" not in admin.get("/tablero/alertas").get_data(as_text=True)
 
 
-def test_pdf_con_libreoffice_simulado(admin, con_tareas, app, monkeypatch, tmp_path):
-    falso = tmp_path / "soffice.exe"
-    falso.write_text("")
-    app.config["SOFFICE_PATH"] = str(falso)
-    llamadas = []
-
-    def run(cmd, **kw):
-        llamadas.append((cmd, kw))
-        salida = cmd[cmd.index("--outdir") + 1]
-        (__import__("pathlib").Path(salida) / "documento.pdf").write_bytes(b"%PDF-1.4 falso")
-        return subprocess.CompletedProcess(cmd, 0)
-
-    monkeypatch.setattr(pdf.subprocess, "run", run)
+def test_listado_ficha_respeta_unidad(como, con_tareas, admin):
     subir(admin, word("{{ tarea.codigo }}"), "ficha.docx")
+    c, _ = como("unidad", "UPT")
+    html = c.get("/tareas").get_data(as_text=True)
+    assert "Descargar ficha de UPT-" in html
+    assert all(f"/tarea/{t.id}?" not in html for t in con_tareas)  # las de UAF no aparecen
+
+
+# ------------------------------------------------------------------ «Descargar PDF» de las vistas
+@pytest.mark.parametrize("alcance,ruta,destino", [
+    ("resumen", "/tablero/resumen.pdf?unidad_id=1", "/resumen?formato=pdf&unidad_id=1"),
+    ("informe", "/tablero/informe.pdf", "/informe?formato=pdf"),
+    ("agenda", "/agenda/agenda.pdf?mes=2026-11", "/agenda?formato=pdf&mes=2026-11"),
+    ("graficos", "/tablero/graficos.pdf", "/graficos?formato=pdf"),
+])
+def test_descargar_pdf_usa_la_plantilla(admin, alcance, ruta, destino):
+    subir(admin, word("{{ unidad.nombre }}"), "x.docx", alcance=alcance)
+    p = Plantilla.query.one()
+    r = admin.get(ruta)
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/documentos/{p.id}{destino}")
+    r = admin.get(ruta, follow_redirects=True)
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF")
+
+
+def test_sin_plantilla_no_hay_pdf_del_sistema(admin):
+    for vista, pdf_url in [("/tablero/resumen", "/tablero/resumen.pdf"), ("/tablero/informe", "/tablero/informe.pdf"),
+                           ("/agenda", "/agenda/agenda.pdf"), ("/tablero/graficos", "/tablero/graficos.pdf")]:
+        assert pdf_url not in admin.get(vista).get_data(as_text=True), vista  # sin plantilla no hay botón
+        r = admin.get(pdf_url)
+        assert r.status_code == 302 and "/documentos/" not in r.headers["Location"], pdf_url
+        assert "Todavía no hay una plantilla" in admin.get(r.headers["Location"]).get_data(as_text=True)
+
+
+def test_invitado_descarga_la_plantilla(como, admin):
+    subir(admin, word("{{ unidad.nombre }}"), "x.docx", alcance="resumen")
+    p = Plantilla.query.one()
+    c, _ = como("invitado", permisos={"todas_unidades": True})
+    r = c.get("/tablero/resumen.pdf")
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/documentos/{p.id}/resumen?formato=pdf")
+    assert c.get(r.headers["Location"]).mimetype == "application/pdf"
+
+
+# ------------------------------------------------------------------ PDF en Python (sin LibreOffice)
+def paginas_pdf(datos: bytes) -> int:
+    return len(re.findall(rb"/Type\s*/Page[^s]", datos))
+
+
+def test_ficha_en_pdf(admin, con_tareas):
+    subir(admin, word("Ficha {{ tarea.codigo }}", tabla_tareas=True), "ficha.docx")
     p = Plantilla.query.one()
     r = admin.get(f"/documentos/{p.id}/tarea/{con_tareas[0].id}?formato=pdf")
-    assert r.status_code == 200 and r.data == b"%PDF-1.4 falso" and r.mimetype == "application/pdf"
-    cmd, kw = llamadas[0]
-    assert "--headless" in cmd and kw["timeout"] == app.config["SOFFICE_TIMEOUT"]
-    assert list((app.config["STORAGE_DIR"] / "generados").iterdir()) == []  # temporales borrados
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF")
+    assert r.headers["Content-Disposition"].endswith(".pdf")
+    assert Auditoria.query.filter_by(accion="descargar_pdf").count() == 1
 
 
-def test_pdf_tiempo_limite(admin, con_tareas, app, monkeypatch, tmp_path):
-    falso = tmp_path / "soffice.exe"
-    falso.write_text("")
-    app.config["SOFFICE_PATH"] = str(falso)
+def test_excel_en_pdf(admin, con_tareas):
+    subir(admin, excel(), "listado.xlsx", alcance="listado", titulo="Listado")
+    p = Plantilla.query.one()
+    r = admin.get(f"/documentos/{p.id}/listado?formato=pdf")
+    assert r.status_code == 200 and r.data.startswith(b"%PDF") and paginas_pdf(r.data) == 1
 
-    def run(cmd, **kw):
-        raise subprocess.TimeoutExpired(cmd, kw["timeout"])
 
-    monkeypatch.setattr(pdf.subprocess, "run", run)
-    with pytest.raises(ErrorNegocio, match="tardó demasiado"):
-        pdf.convertir_a_pdf(word("x"), "docx")
-    assert list((app.config["STORAGE_DIR"] / "generados").iterdir()) == []
+def test_probar_en_pdf(admin):
+    subir(admin, word("{{ tarea.codigo }}"), "ficha.docx")
+    p = Plantilla.query.one()
+    r = admin.get(f"/admin/plantillas/{p.id}/probar?formato=pdf")
+    assert r.status_code == 200 and r.data.startswith(b"%PDF")
+
+
+def test_word_completo_se_dibuja(app):
+    """Encabezado con tabulador y nº de página, lista, tabla con celdas combinadas y fondo, imagen y salto de página."""
+    from docx.enum.text import WD_BREAK
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt, RGBColor
+    from PIL import Image as Imagen
+
+    d = docx.Document()
+    encabezado = d.sections[0].header.paragraphs[0]
+    encabezado.text = "Izquierda"
+    encabezado.add_run().add_tab()
+    run = encabezado.add_run()
+    for tipo, texto in (("begin", None), (None, " PAGE "), ("separate", None), (None, "1"), ("end", None)):
+        if tipo:
+            fld = OxmlElement("w:fldChar")
+            fld.set(qn("w:fldCharType"), tipo)
+            run._r.append(fld)
+        elif texto.strip() == "PAGE":
+            instr = OxmlElement("w:instrText")
+            instr.text = texto
+            run._r.append(instr)
+        else:
+            run._r.append(OxmlElement("w:t"))
+            run._r[-1].text = texto
+    encabezado.paragraph_format.tab_stops.add_tab_stop(Cm(16), alignment=2)  # derecha
+    d.add_heading("Título", level=1)
+    r = d.add_paragraph().add_run("Negrita roja")
+    r.bold, r.font.size, r.font.color.rgb = True, Pt(14), RGBColor(0xC0, 0, 0)
+    d.add_paragraph("Uno", style="List Bullet")
+    d.add_paragraph("Dos", style="List Number")
+    t = d.add_table(rows=3, cols=3)
+    t.style = "Table Grid"
+    t.cell(0, 0).merge(t.cell(0, 2)).text = "Combinada"
+    t.cell(1, 0).merge(t.cell(2, 0)).text = "Vertical"
+    sombra = OxmlElement("w:shd")
+    sombra.set(qn("w:fill"), "1F3864")
+    t.cell(1, 1)._tc.get_or_add_tcPr().append(sombra)
+    buf = io.BytesIO()
+    Imagen.new("RGB", (40, 20), "red").save(buf, "PNG")
+    d.add_picture(io.BytesIO(buf.getvalue()), width=Cm(4))
+    d.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+    d.add_paragraph("Segunda página")
+    salida = io.BytesIO()
+    d.save(salida)
+    resultado = pdf.convertir_a_pdf(salida.getvalue(), "docx")
+    assert resultado.startswith(b"%PDF") and paginas_pdf(resultado) == 2
+
+
+def test_formulas_y_formatos_de_excel(app):
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"], ws["A2"], ws["A3"] = 10, 20.5, "=SUM(A1:A2)"
+    ws["B1"], ws["B2"] = "=ROW()-0", "=A1*2+A2"
+    ws["C1"], ws["C2"] = '=VLOOKUP(1,A1:A2,1)', "=C3"  # no soportada / vacía
+    calc = pdf._Formulas(ws)
+    assert calc.valor(ws["A3"]) == 30.5 and calc.valor(ws["B1"]) == 1 and calc.valor(ws["B2"]) == 40.5
+    assert calc.valor(ws["C1"]) is None and calc.valor(ws["C2"]) == 0
+    assert pdf._formatear(1234.5, "#,##0.00") == "1.234,50"
+    assert pdf._formatear(0.756, "0%") == "76 %" and pdf._formatear(3.0, "General") == "3"
+    from datetime import date
+    assert pdf._formatear(date(2026, 11, 20), "yyyy-mm-dd") == "20/11/2026"
+    ws.merge_cells("A5:C5")
+    ws["A5"] = "Título combinado"
+    buf = io.BytesIO()
+    wb.save(buf)
+    assert pdf.convertir_a_pdf(buf.getvalue(), "xlsx").startswith(b"%PDF")
+
+
+def test_documento_danado_da_error_legible(app):
+    with pytest.raises(ErrorNegocio, match="No se pudo convertir"):
+        pdf.convertir_a_pdf(b"no es un docx", "docx")
 
 
 # ------------------------------------------------------------------ resumen, agenda y gráficos
@@ -350,8 +473,9 @@ def test_resumen_ejecutivo_en_word(admin, con_tareas):
     texto = texto_word(r.data)
     assert "Gestiones: 3 · vencidas 1" in texto
     assert "UAF" in texto and "UPT" in texto and "SISTEMAS" in texto
-    # el menú aparece en la vista
-    assert f"/documentos/{p.id}/resumen" in admin.get("/tablero/resumen").get_data(as_text=True)
+    # la vista tiene un solo botón, el «Descargar PDF» de siempre
+    html = admin.get("/tablero/resumen").get_data(as_text=True)
+    assert "Generar documento" not in html and "/tablero/resumen.pdf" in html
 
 
 def test_resumen_en_excel_repite_unidades_e_instancias(como, admin, con_tareas):
@@ -402,7 +526,8 @@ def test_graficos_en_word_con_imagenes(admin, con_tareas):
     assert "Pendientes 3" in texto_word(r.data) and "Pendiente" in texto_word(r.data)
     assert len(imagenes_en(r.data)) == 4  # los cuatro gráficos como imágenes
     for ruta in ("/", "/tablero/graficos"):
-        assert f"/documentos/{p.id}/graficos" in admin.get(ruta).get_data(as_text=True)
+        html = admin.get(ruta).get_data(as_text=True)
+        assert "Generar documento" not in html and "/tablero/graficos.pdf" in html
 
 
 def test_graficos_en_excel_por_unidad_y_mensual(admin, con_tareas):
@@ -416,13 +541,14 @@ def test_graficos_en_excel_por_unidad_y_mensual(admin, con_tareas):
 
 
 @pytest.mark.parametrize("alcance,ruta", [("resumen", "resumen"), ("agenda", "agenda"), ("graficos", "graficos")])
-def test_invitado_no_genera_documentos_del_tablero(como, admin, alcance, ruta):
+def test_invitado_usa_las_plantillas_del_tablero(como, admin, alcance, ruta):
     subir(admin, word("{{ unidad.nombre }}"), "x.docx", alcance=alcance)
     p = Plantilla.query.one()
     c, _ = como("invitado", permisos={"todas_unidades": True})
-    assert c.get(f"/documentos/{p.id}/{ruta}").status_code == 403
+    assert c.get(f"/documentos/{p.id}/{ruta}").status_code == 200
     vista = {"resumen": "/tablero/resumen", "agenda": "/agenda", "graficos": "/tablero/graficos"}[alcance]
-    assert f"/documentos/{p.id}/" not in c.get(vista).get_data(as_text=True)  # tampoco ve el menú
+    html = c.get(vista).get_data(as_text=True)
+    assert "Descargar PDF" in html and "Generar documento" not in html
 
 
 def test_alcance_distinto_da_404(admin):

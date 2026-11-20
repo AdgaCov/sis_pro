@@ -9,11 +9,8 @@
   </div>
 </div>
 <p class="text-muted">Suba un Word (.docx) o Excel (.xlsx) con marcadores como <code>{{ '{{ tarea.codigo }}' }}</code>.
-  Las plantillas activas aparecen en «Generar documento» de la ficha de una tarea, del listado o del informe crítico, según su alcance.</p>
-{% if not hay_libreoffice %}
-<div class="alert alert-warning small">LibreOffice no está instalado en el servidor: los documentos se pueden descargar en Word o Excel,
-  pero no en PDF. Instálelo o indique su ruta en <code>SOFFICE_PATH</code> del archivo <code>.env</code>.</div>
-{% endif %}
+  Cada vista descarga en PDF, con su botón «Descargar PDF», la plantilla activa de su alcance (si hay varias, la editada
+  más recientemente). Sin plantilla, la vista no ofrece PDF.</p>
 
 <div class="table-responsive">
 <table class="table table-sm align-middle bg-white">
@@ -34,7 +31,7 @@
       <td class="text-end text-nowrap">
         <div class="btn-group">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_plantillas.probar', plantilla_id=p.id) }}">Probar</a>
-          {% if hay_libreoffice %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_plantillas.probar', plantilla_id=p.id, formato='pdf') }}">PDF</a>{% endif %}
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_plantillas.probar', plantilla_id=p.id, formato='pdf') }}">PDF</a>
         </div>
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_plantillas.editar', plantilla_id=p.id) }}">Editar</a>
         <form class="d-inline" method="post" action="{{ url_for('admin_plantillas.estado', plantilla_id=p.id) }}">

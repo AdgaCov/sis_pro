@@ -1,10 +1,11 @@
-from flask import Blueprint, abort, current_app, make_response, render_template
+from flask import Blueprint, abort, current_app, render_template
 from flask_login import current_user
 
-from app.controllers.tareas import formulario_filtros, texto_filtros
-from app.extensions import db
-from app.services import agenda, auditoria, graficos, pdf, permisos, plantillas, resumen
-from app.utils.fechas import a_local, ahora_utc, formato_fecha_hora, hoy_local
+from app.controllers.documentos import descargar_pdf
+from app.controllers.tareas import formulario_filtros
+from app.services import agenda, graficos, permisos, resumen
+from app.services.plantillas import vigente_para
+from app.utils.fechas import hoy_local
 
 bp = Blueprint("tablero", __name__, url_prefix="/tablero")
 
@@ -32,30 +33,14 @@ def resumen_ejecutivo():
     datos = resumen.resumen_ejecutivo(infos, permisos.unidades_visibles(current_user))
     detalle = resumen.filtrar(infos, filtro.data, solo_mre=True)
     return render_template("tablero/resumen.html", datos=datos, detalle=detalle,
-                           plantillas=plantillas.activas_para(current_user, "resumen"), **ctx)
+                           plantilla_pdf=vigente_para("resumen"), **ctx)
 
 
 @bp.route("/resumen.pdf")
 def resumen_pdf():
+    """La plantilla que subió el admin, en PDF."""
     _exigir("resumen")
-    filtro = formulario_filtros()
-    infos = resumen.cargar(current_user)
-    unidades = permisos.unidades_visibles(current_user)
-    datos = resumen.resumen_ejecutivo(infos, unidades)
-    detalle = resumen.filtrar(infos, filtro.data, solo_mre=True)
-    alcance = "Unidades: " + (", ".join(u.sigla for u in unidades) or "ninguna")
-    ahora = ahora_utc()
-    generado = f"Generado el {formato_fecha_hora(ahora)} por {current_user.nombre_usuario}"
-    contenido = pdf.resumen_ejecutivo(datos, detalle, alcance, "Filtros del detalle: " + texto_filtros(filtro), generado)
-
-    auditoria.registrar("descargar_pdf", current_user, "resumen", None, {"gestiones": len(detalle)})
-    db.session.commit()
-    nombre = f"Resumen_Ejecutivo_MRE_{a_local(ahora):%Y%m%d}.pdf"
-    resp = make_response(contenido)
-    resp.headers["Content-Type"] = "application/pdf"
-    resp.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return descargar_pdf("resumen", "documentos.resumen_ejecutivo", "tablero.resumen_ejecutivo")
 
 
 @bp.route("/alertas")
@@ -75,27 +60,14 @@ def informe():
     ctx = _contexto(filtro)
     infos = resumen.filtrar(resumen.cargar(current_user), {"unidad_id": filtro.unidad_id.data})
     return render_template("tablero/informe.html", datos=resumen.informe_critico(infos, ctx["unidades"]),
-                           plantillas=plantillas.activas("informe"), **ctx)
+                           plantilla_pdf=vigente_para("informe"), **ctx)
 
 
 @bp.route("/informe.pdf")
 def informe_pdf():
+    """La plantilla que subió el admin, en PDF."""
     _exigir("informe")
-    filtro = formulario_filtros()
-    ctx = _contexto(filtro)
-    infos = resumen.filtrar(resumen.cargar(current_user), {"unidad_id": filtro.unidad_id.data})
-    datos = resumen.informe_critico(infos, ctx["unidades"])
-    alcance = "Unidades: " + (", ".join(u.sigla for u in ctx["unidades"]) or "ninguna")
-    ahora = ahora_utc()
-    generado = f"Generado el {formato_fecha_hora(ahora)} por {current_user.nombre_usuario}"
-    contenido = pdf.informe_critico(datos, alcance, generado)
-    auditoria.registrar("descargar_pdf", current_user, "informe", None, {"criticas": datos["total"]})
-    db.session.commit()
-    resp = make_response(contenido)
-    resp.headers["Content-Type"] = "application/pdf"
-    resp.headers["Content-Disposition"] = f'attachment; filename="Informe_Critico_{a_local(ahora):%Y%m%d}.pdf"'
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return descargar_pdf("informe", "documentos.informe", "tablero.informe")
 
 
 @bp.route("/cronograma")
@@ -129,7 +101,7 @@ def contexto_graficos(filtro) -> dict:
     desde, hasta = agenda.rango_calendario(mes)
     calendario = agenda.calendario(mes, agenda.eventos(infos, desde, hasta, hoy), hoy)
     return dict(datos=datos, por_unidad=por_unidad, solo_mre=solo_mre,
-                plantillas=plantillas.activas_para(current_user, "graficos"),
+                plantilla_pdf=vigente_para("graficos"),
                 proximos=graficos.proximos_vencimientos(infos), calendario=calendario,
                 titulo_mes=agenda.nombre_mes(mes), dias_semana=agenda.DIAS_SEMANA, **ctx)
 
@@ -142,18 +114,6 @@ def graficos_vista():
 
 @bp.route("/graficos.pdf")
 def graficos_pdf():
+    """La plantilla que subió el admin, en PDF."""
     _exigir("graficos")
-    filtro = formulario_filtros()
-    ctx, infos, datos, por_unidad, solo_mre = _datos_graficos(filtro)
-    alcance = "Unidades: " + (", ".join(u.sigla for u in ctx["unidades"]) or "ninguna")
-    if solo_mre:
-        alcance += " · solo gestiones con el MRE"
-    generado = f"Generado el {formato_fecha_hora(ahora_utc())} por {current_user.nombre_usuario}"
-    contenido = pdf.graficos(datos, por_unidad, graficos.proximos_vencimientos(infos), alcance, generado)
-    auditoria.registrar("descargar_pdf", current_user, "graficos", None, {"tareas": len(infos)})
-    db.session.commit()
-    resp = make_response(contenido)
-    resp.headers["Content-Type"] = "application/pdf"
-    resp.headers["Content-Disposition"] = f'attachment; filename="Tablero_Graficos_{a_local(ahora_utc()):%Y%m%d}.pdf"'
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return descargar_pdf("graficos", "documentos.graficos", "tablero.graficos_vista")

@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import filtros, menu_documentos %}
-{% macro url_doc(p, formato) %}{{ url_for('documentos.graficos', plantilla_id=p.id, formato=formato, **request.args) }}{% endmacro %}
+{% from "_macros.html" import filtros %}
 {% block titulo %}Gráficos{% endblock %}
 {% block contenido %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
@@ -12,8 +11,7 @@
     </p>
   </div>
   <div class="text-nowrap">
-    <a class="btn btn-primary btn-sm" href="{{ url_for('tablero.graficos_pdf', **request.args) }}">Descargar PDF</a>
-    {{ menu_documentos(plantillas, url_doc, hay_pdf(), clase='btn-sm') }}
+    {% if plantilla_pdf %}<a class="btn btn-primary btn-sm" href="{{ url_for('tablero.graficos_pdf', **request.args) }}">Descargar PDF</a>{% endif %}
   </div>
 </div>
 

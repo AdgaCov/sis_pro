@@ -3,7 +3,6 @@ import json
 from datetime import date, datetime, timedelta
 
 import pytest
-from reportlab import rl_config
 
 from app.extensions import db
 from app.models import Catalogo, Subtarea
@@ -18,11 +17,6 @@ HOY = date(2026, 11, 18)
 
 def cat(tipo, valor):
     return Catalogo.query.filter_by(tipo=tipo, valor=valor).one()
-
-
-@pytest.fixture
-def pdf_legible(monkeypatch):
-    monkeypatch.setattr(rl_config, "pageCompression", 0)
 
 
 @pytest.fixture
@@ -101,7 +95,7 @@ def test_agenda_navega_por_meses(como, datos):
     assert "Enero 2027" in c.get("/agenda?mes=2027-01").get_data(as_text=True)
     for raro in ("0001-01", "9999-12", "1-1", "2026-13"):
         assert c.get(f"/agenda?mes={raro}").status_code == 200
-        assert c.get(f"/agenda/agenda.pdf?mes={raro}").status_code == 200
+        assert c.get(f"/agenda/agenda.pdf?mes={raro}").status_code == 302  # sin plantilla: vuelve a la vista
 
 
 def test_agenda_muestra_tres_meses(como, hacer_tarea):
@@ -129,13 +123,16 @@ def test_mes_en_pantalla_no_repite_eventos_de_otros_meses(hacer_tarea):
     assert dic["eventos"] == 1 and nov["elegido"] and not dic["elegido"]
 
 
-def test_pdf_agenda(como, datos, pdf_legible):
+def test_pdf_agenda(como, datos, poner_plantilla, pdf_como_texto):
     mre, interna, upt = datos
+    poner_plantilla("agenda", "Agenda {{ mes.nombre }}", "{% for e in eventos %}[{{ e.codigo }} {{ e.texto }}]{% endfor %}")
     mes = f"{mre.fecha_limite:%Y-%m}"
     c, _ = como("invitado", unidades_invitado=["UAF", "UPT"])
-    r = c.get(f"/agenda/agenda.pdf?mes={mes}")
+    assert "/agenda/agenda.pdf" in c.get(f"/agenda?mes={mes}").get_data(as_text=True)
+    r = c.get(f"/agenda/agenda.pdf?mes={mes}", follow_redirects=True)
     assert r.status_code == 200 and r.data.startswith(b"%PDF") and r.mimetype == "application/pdf"
-    assert b"UAF-001" in r.data and b"Tarea interna reservada" not in r.data
+    assert f"_{mre.fecha_limite:%Y_%m}.pdf" in r.headers["Content-Disposition"]
+    assert b"UAF-001" in r.data and "Tarea interna reservada".encode() not in r.data
 
 
 # ------------------------------------------------------------------ gráficos
@@ -185,12 +182,17 @@ def test_invitado_graficos_solo_mre(como, datos):
     assert 'data-tareas=""' in html  # no navega a tareas
 
 
-def test_pdf_graficos(como, datos, pdf_legible):
+def test_pdf_graficos(como, datos, poner_plantilla, pdf_como_texto):
+    poner_plantilla("graficos", "TABLERO {{ indicadores.pendientes }}", "{% for t in tareas %}[{{ t.codigo }}]{% endfor %}")
     for rol, sigla, kw in [("admin", None, {}), ("unidad", "UAF", {}), ("invitado", None, {"unidades_invitado": ["UAF"]})]:
         c, _ = como(rol, sigla, **kw)
-        r = c.get("/tablero/graficos.pdf")
+        r = c.get("/tablero/graficos.pdf", follow_redirects=True)
         assert r.status_code == 200 and r.data.startswith(b"%PDF"), rol
-        assert b"TABLERO DE SEGUIMIENTO MRE" in r.data
+        assert b"TABLERO" in r.data
+        if rol != "admin":
+            assert b"UPT-001" not in r.data, rol  # solo sus unidades
+        if rol == "invitado":
+            assert b"UAF-002" not in r.data  # la interna no sale al invitado
 
 
 # ------------------------------------------------------------------ permisos del invitado

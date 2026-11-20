@@ -87,7 +87,8 @@ def lista():
     pagina = Pagina(infos, request.args.get("pagina", 1, type=int), current_app.config["TAREAS_POR_PAGINA"])
     puede_crear = current_user.ve_todo or (current_user.es_unidad and current_user.unidad_id)
     return render_template("tareas/lista.html", pagina=pagina, filtro=filtro, puede_crear=puede_crear,
-                           plantillas=srv_plantillas.activas("listado"))
+                           plantilla_listado=srv_plantillas.vigente_para("listado"),
+                           ficha=srv_plantillas.vigente_para("tarea"))
 
 
 # ------------------------------------------------------------------ alta / edición
@@ -146,7 +147,7 @@ def detalle(tarea_id: int):
         "tareas/detalle.html", tarea=tarea, habilitada_por=habilitada_por, info=alertas.info(tarea, bloqueada_por=abiertas),
         puede_editar=permisos.puede_editar_tarea(current_user, tarea),
         ve_adjuntos=permisos.puede_ver_adjuntos(current_user, tarea),
-        accion=AccionForm(), form_adjunto=AdjuntoForm(), plantillas=srv_plantillas.activas("tarea"),
+        accion=AccionForm(), form_adjunto=AdjuntoForm(), ficha=srv_plantillas.vigente_para("tarea"),
         ve_habilita=tarea.habilita_a is not None and permisos.puede_ver_tarea(current_user, tarea.habilita_a),
     )
 
