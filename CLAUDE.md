@@ -1,3 +1,48 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# Setup
+cp .env.example .env          # fill in SECRET_KEY and DATABASE_URL
+pip install -r requirements.txt
+flask db upgrade
+flask crear-admin             # first admin (interactive)
+flask cargar-catalogos        # loads units, roles, catalog values (safe to re-run)
+
+# Run
+flask run --debug
+
+# Tests (use SQLite in-memory by default; no DB required)
+pytest
+pytest tests/test_auth.py                        # single file
+pytest tests/test_tareas.py -k test_crear_tarea  # single test
+pytest -x                                        # stop on first failure
+
+# DB checks
+flask db check                # verify models match migrations
+```
+
+`TEST_DATABASE_URL` env var overrides the in-memory SQLite for tests (e.g. a local MariaDB).
+
+## Architecture patterns
+
+**Permission gateway** — controllers never query `Tarea` directly. All task queries go through `services/permisos.py:consulta_tareas(usuario)`, which applies unit-visibility filtering. `unidades_visibles()` and `puede_ver_tarea/puede_editar_tarea` follow the same pattern. Break this and guest isolation breaks silently.
+
+**ErrorNegocio flow** — services raise `ErrorNegocio("message")` (defined in `services/__init__.py`). Controllers catch it, call `db.session.rollback()`, then `flash(str(e), "danger")`. Models never raise `ErrorNegocio`; models never import services.
+
+**Alert computation** — alerts (`services/alertas.py`) are computed in Python at read time, never persisted. This means you cannot filter or sort by alert in SQL. Alert-filtered lists are paginated in memory via `utils/paginacion.py`. The seven-level priority order is fixed in code; changing thresholds is done in `config.py`.
+
+**Session identity** — `login_manager.user_loader` receives `"{uid}:{version_sesion}"`. Incrementing `version_sesion` on a user record (password reset, role change, deactivation) invalidates all existing sessions for that user without touching the session store.
+
+**`guardas_globales`** (`utils/decoradores.py`) runs as `before_request` on every request: enforces session expiry (absolute 8 h), blocks all guest writes globally (not per-view), and redirects on `debe_cambiar_clave`. The `@solo_lectura` decorator is a belt-and-suspenders guard on individual views, not the primary enforcement.
+
+**Catalog references** — `Tarea` stores foreign keys to `Catalogo` rows for tipo, estado, instancia, prioridad, area. Protected values (`Tarea interna`, `Concluido`, `Alta`) are matched by name in service code — do not rename them in the database. Deactivating a catalog value removes it from forms but leaves existing tasks intact.
+
+---
+
 # Seguimiento MRE · Bolivia en el Mundo
 
 App web para que las unidades de Bolivia en el Mundo registren sus tareas y trámites con el MRE,

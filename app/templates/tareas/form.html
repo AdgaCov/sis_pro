@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block ancho_contenido %}ancho-form{% endblock %}
 {% from "_macros.html" import campo %}
 {% block titulo %}{{ 'Editar ' ~ tarea.codigo if tarea else 'Nueva tarea' }}{% endblock %}
 {% block contenido %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block ancho_contenido %}ancho-form{% endblock %}
 {% from "_macros.html" import chip_alerta, menu_documentos %}
 {% macro url_doc(p, formato) %}{{ url_for('documentos.tarea', plantilla_id=p.id, tarea_id=tarea.id, formato=formato) }}{% endmacro %}
 {% block titulo %}{{ tarea.codigo }}{% endblock %}

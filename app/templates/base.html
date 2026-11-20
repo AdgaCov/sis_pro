@@ -5,82 +5,147 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Seguimiento MRE{% endblock %} · Bolivia en el Mundo</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
+{% macro nav_items() %}
+<ul class="sidebar-nav">
+  {% if not current_user.debe_cambiar_clave %}
+  {% if not current_user.es_invitado %}
+  <li><a href="{{ url_for('inicio.index') }}" title="Inicio"
+         class="sidebar-link{% if request.endpoint == 'inicio.index' %} activo{% endif %}">
+    <i class="bi bi-house-door sidebar-icon"></i><span class="sidebar-text">Inicio</span></a></li>
+  {% endif %}
+  {% if puede_ver_vista(current_user, 'tareas') %}
+  <li><a href="{{ url_for('tareas.lista') }}" title="Tareas"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('tareas.') and request.endpoint != 'tareas.papelera' %} activo{% endif %}">
+    <i class="bi bi-list-check sidebar-icon"></i><span class="sidebar-text">Tareas</span></a></li>
+  {% endif %}
+  {% for vista, endpoint, texto, icono in [
+      ('resumen',    'tablero.resumen_ejecutivo', 'Resumen',         'bi-bar-chart-line'),
+      ('alertas',    'tablero.alertas',           'Alertas',         'bi-bell'),
+      ('informe',    'tablero.informe',           'Informe crítico', 'bi-flag'),
+      ('cronograma', 'tablero.cronograma',        'Cronograma',      'bi-calendar-range'),
+      ('agenda',     'agenda.mes',                'Agenda',          'bi-calendar-week'),
+      ('graficos',   'tablero.graficos_vista',    'Gráficos',        'bi-graph-up'),
+  ] %}
+    {% if puede_ver_vista(current_user, vista) %}
+    <li><a href="{{ url_for(endpoint) }}" title="{{ texto }}"
+           class="sidebar-link{% if request.endpoint == endpoint %} activo{% endif %}">
+      <i class="bi {{ icono }} sidebar-icon"></i><span class="sidebar-text">{{ texto }}</span></a></li>
+    {% endif %}
+  {% endfor %}
+  {% if not current_user.es_invitado %}
+  <li><a href="{{ url_for('responsables.lista') }}" title="Responsables"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('responsables.') %} activo{% endif %}">
+    <i class="bi bi-people sidebar-icon"></i><span class="sidebar-text">Responsables</span></a></li>
+  {% endif %}
+  {% if current_user.es_admin %}
+  <li class="sidebar-separador"><span class="sidebar-text">Administración</span></li>
+  <li><a href="{{ url_for('admin_usuarios.lista') }}" title="Usuarios"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('admin_usuarios.') %} activo{% endif %}">
+    <i class="bi bi-person-gear sidebar-icon"></i><span class="sidebar-text">Usuarios</span></a></li>
+  <li><a href="{{ url_for('admin_invitados.lista') }}" title="Invitados"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('admin_invitados.') %} activo{% endif %}">
+    <i class="bi bi-person-check sidebar-icon"></i><span class="sidebar-text">Invitados</span></a></li>
+  <li><a href="{{ url_for('admin_plantillas.lista') }}" title="Plantillas"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('admin_plantillas.') %} activo{% endif %}">
+    <i class="bi bi-file-earmark-text sidebar-icon"></i><span class="sidebar-text">Plantillas</span></a></li>
+  <li><a href="{{ url_for('admin_catalogos.lista') }}" title="Catálogos"
+         class="sidebar-link{% if request.endpoint and request.endpoint.startswith('admin_catalogos.') %} activo{% endif %}">
+    <i class="bi bi-tags sidebar-icon"></i><span class="sidebar-text">Catálogos</span></a></li>
+  <li><a href="{{ url_for('tareas.papelera') }}" title="Papelera"
+         class="sidebar-link{% if request.endpoint == 'tareas.papelera' %} activo{% endif %}">
+    <i class="bi bi-trash3 sidebar-icon"></i><span class="sidebar-text">Papelera</span></a></li>
+  {% endif %}
+  {% endif %}
+</ul>
+{% endmacro %}
+
+<div class="app-shell{% if current_user.is_authenticated %} autenticado{% endif %}">
 {% if current_user.is_authenticated %}
-<nav class="navbar navbar-expand-md navbar-dark barra">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-semibold" href="{{ url_for('inicio.index') }}">Seguimiento MRE</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu"
-            aria-controls="menu" aria-expanded="false" aria-label="Menú">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="menu">
-      <ul class="navbar-nav me-auto">
-        {% if not current_user.debe_cambiar_clave %}
-        {% if not current_user.es_invitado %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('inicio.index') }}">Inicio</a></li>
-        {% endif %}
-        {% if puede_ver_vista(current_user, 'tareas') %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('tareas.lista') }}">Tareas</a></li>
-        {% endif %}
-        {% for vista, endpoint, texto in [('resumen', 'tablero.resumen_ejecutivo', 'Resumen'), ('alertas', 'tablero.alertas', 'Alertas'),
-                                          ('informe', 'tablero.informe', 'Informe crítico'), ('cronograma', 'tablero.cronograma', 'Cronograma'),
-                                          ('agenda', 'agenda.mes', 'Agenda'), ('graficos', 'tablero.graficos_vista', 'Gráficos')] %}
-          {% if puede_ver_vista(current_user, vista) %}
-          <li class="nav-item"><a class="nav-link {{ 'active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}">{{ texto }}</a></li>
-          {% endif %}
-        {% endfor %}
-        {% if not current_user.es_invitado %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('responsables.lista') }}">Responsables</a></li>
-        {% endif %}
-        {% if current_user.es_admin %}
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_usuarios.lista') }}">Usuarios</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_invitados.lista') }}">Invitados</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_plantillas.lista') }}">Plantillas</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_catalogos.lista') }}">Catálogos</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('tareas.papelera') }}">Papelera</a></li>
-        {% endif %}
-        {% endif %}
-      </ul>
-      <ul class="navbar-nav">
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            {{ current_user.nombre_completo }}
-            <span class="badge text-bg-light ms-1">{{ current_user.unidad.sigla if current_user.unidad else current_user.rol }}</span>
-          </a>
-          <ul class="dropdown-menu dropdown-menu-end">
-            <li><span class="dropdown-item-text small text-muted">{{ current_user.nombre_rol }}</span></li>
-            <li><a class="dropdown-item" href="{{ url_for('auth.cambiar_clave') }}">Cambiar contraseña</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <form method="post" action="{{ url_for('auth.logout') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="dropdown-item" type="submit">Salir</button>
-              </form>
-            </li>
-          </ul>
-        </li>
-      </ul>
+  <header class="app-header d-flex align-items-center justify-content-between px-3">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-link text-white p-1 d-lg-none lh-1"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#sidebarOffcanvas"
+              aria-controls="sidebarOffcanvas"
+              aria-label="Abrir menú">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+      </button>
+      <button class="btn btn-link text-white p-1 d-none d-lg-flex align-items-center sidebar-toggle-btn"
+              type="button"
+              data-action="toggle-sidebar"
+              aria-label="Ocultar menú">
+        <svg class="icon-drawer-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+        <svg class="icon-drawer-on d-none" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+      <img src="{{ url_for('static', filename='logo_bolmun.jpg') }}" height="34" alt="Bolivia en el Mundo" class="rounded-1 d-none d-lg-block">
+      <a class="text-white fw-semibold text-decoration-none small" href="{{ url_for('inicio.index') }}">Seguimiento MRE</a>
     </div>
-  </div>
-</nav>
+    <ul class="navbar-nav">
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle text-white py-2" href="#" role="button"
+           data-bs-toggle="dropdown" aria-expanded="false">
+          {{ current_user.nombre_completo }}
+          <span class="badge text-bg-light ms-1">{{ current_user.unidad.sigla if current_user.unidad else current_user.rol }}</span>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text small text-muted">{{ current_user.nombre_rol }}</span></li>
+          <li><a class="dropdown-item" href="{{ url_for('auth.cambiar_clave') }}">Cambiar contraseña</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="dropdown-item" type="submit">Salir</button>
+            </form>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </header>
 {% endif %}
 
-<main class="{% block contenedor %}container py-4{% endblock %}">
-  {% with mensajes = get_flashed_messages(with_categories=true) %}
-    {% for categoria, mensaje in mensajes %}
-      <div class="alert alert-{{ 'info' if categoria == 'message' else categoria }} alert-dismissible fade show" role="alert">
-        {{ mensaje }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+  <div class="app-cuerpo">
+{% if current_user.is_authenticated %}
+    <nav class="app-sidebar d-none d-lg-flex flex-column" aria-label="Navegación principal">
+      {{ nav_items() }}
+    </nav>
+
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarLabel">
+      <div class="offcanvas-header gap-2">
+        <img src="{{ url_for('static', filename='logo_bolmun.jpg') }}" height="36" alt="Bolivia en el Mundo" class="rounded-1">
+        <span class="fw-semibold text-white" id="sidebarLabel">Seguimiento MRE</span>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
       </div>
-    {% endfor %}
-  {% endwith %}
-  {% block contenido %}{% endblock %}
-</main>
+      <div class="offcanvas-body p-0">
+        {{ nav_items() }}
+      </div>
+    </div>
+{% endif %}
+
+    <main class="app-contenido">
+      <div class="{% block ancho_contenido %}ancho-wide{% endblock %}">
+        {% block flashes %}
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+          {% for categoria, mensaje in mensajes %}
+            <div class="alert alert-{{ 'info' if categoria == 'message' else categoria }} alert-dismissible fade show" role="alert">
+              {{ mensaje }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+          {% endfor %}
+        {% endwith %}
+        {% endblock %}
+        {% block contenido %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

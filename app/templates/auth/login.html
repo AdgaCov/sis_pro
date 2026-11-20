@@ -1,25 +1,43 @@
 {% extends "base.html" %}
 {% from "_macros.html" import campo %}
 {% block titulo %}Ingresar{% endblock %}
-{% block contenedor %}container py-5{% endblock %}
+{% block ancho_contenido %}ancho-login{% endblock %}
+{% block flashes %}{% endblock %}
 {% block contenido %}
-<div class="row justify-content-center">
-  <div class="col-sm-10 col-md-6 col-lg-4">
-    <div class="text-center mb-4">
-      <h1 class="h4 fw-semibold titulo-app mb-1">Seguimiento MRE</h1>
-      <p class="text-muted mb-0">Bolivia en el Mundo · Tareas y trámites con el MRE</p>
-    </div>
-    <div class="card shadow-sm">
-      <div class="card-body p-4">
-        <form method="post" novalidate>
-          {{ form.hidden_tag() }}
-          {{ campo(form.nombre_usuario, autocomplete="username", autofocus=true) }}
-          {{ campo(form.clave, autocomplete="current-password") }}
-          {{ form.enviar(class="btn btn-primary w-100") }}
-        </form>
+<div class="login-panel">
+  <div class="login-izquierda">
+    <div class="login-encabezado">
+      <img src="{{ url_for('static', filename='logo_bolmun.jpg') }}" height="40" alt="Bolivia en el Mundo" class="rounded-1">
+      <div>
+        <div class="fw-semibold titulo-app lh-sm">Seguimiento MRE</div>
+        <div class="small text-muted lh-sm">Bolivia en el Mundo</div>
       </div>
     </div>
-    <p class="small text-muted text-center mt-3">¿Olvidó su contraseña? Pida a Planificación que la restablezca.</p>
+    <div class="login-cuerpo">
+      {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% for categoria, mensaje in mensajes %}
+          <div class="alert alert-{{ 'info' if categoria == 'message' else categoria }} alert-dismissible fade show py-2 small" role="alert">
+            {{ mensaje }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      <h1 class="h5 fw-semibold mb-4">Ingrese a su cuenta</h1>
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        {{ campo(form.nombre_usuario, autocomplete="username", autofocus=true) }}
+        {{ campo(form.clave, autocomplete="current-password") }}
+        {{ form.enviar(class="btn btn-primary w-100 mt-1") }}
+      </form>
+      <p class="small text-muted text-center mt-4 mb-0">¿Olvidó su contraseña? Pida a Planificación que la restablezca.</p>
+    </div>
+  </div>
+  <div class="login-derecha d-none d-md-flex">
+    <img src="{{ url_for('static', filename='logo_bolmun.jpg') }}" alt="Bolivia en el Mundo" class="login-logo-grande rounded-3 shadow mb-4">
+    <div class="fw-semibold fs-5 text-white">Bolivia en el Mundo</div>
+    <p class="small text-center mt-2 mb-0" style="color: rgba(255,255,255,.65); max-width: 260px;">
+      Sistema de registro y seguimiento de tareas<br>y trámites con el Ministerio de Relaciones Exteriores
+    </p>
   </div>
 </div>
 {% endblock %}

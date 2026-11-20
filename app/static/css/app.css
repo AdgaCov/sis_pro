@@ -8,10 +8,60 @@
   --bs-primary-rgb: 31, 56, 100;
   --bs-link-color: #2E4A7D;
   --bs-link-color-rgb: 46, 74, 125;
+  --espacio-seccion: 1.5rem;
 }
 
+/* ---------- app shell ---------- */
 body { background: var(--fondo); color: var(--texto); }
-.barra { background: var(--azul); }
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.app-shell.autenticado { height: 100vh; overflow: hidden; }
+.app-shell.autenticado .app-cuerpo { overflow: hidden; }
+.app-shell.autenticado .app-contenido { overflow-y: auto; }
+.app-header { flex-shrink: 0; background: var(--azul); height: 52px; }
+.app-cuerpo { display: flex; flex: 1; min-height: 0; }
+.app-sidebar { width: 240px; flex-shrink: 0; background: var(--azul); overflow-y: auto; overflow-x: hidden; transition: width .2s ease; }
+.autenticado.sidebar-colapsado .app-sidebar { width: 52px; }
+.app-contenido { flex: 1; min-width: 0; background: var(--fondo); }
+#sidebarOffcanvas { background-color: var(--azul); }
+
+
+/* sidebar toggle button */
+.sidebar-toggle-btn { opacity: .7; transition: opacity .15s; }
+.sidebar-toggle-btn:hover { opacity: 1; }
+
+/* contenedor de contenido */
+.ancho-wide { width: 100%; padding: var(--espacio-seccion) calc(var(--espacio-seccion) * 0.833); }
+.ancho-form { max-width: 860px; margin: 0 auto; padding: var(--espacio-seccion) calc(var(--espacio-seccion) * 0.833); }
+.ancho-auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1.25rem; }
+.ancho-auth > * { width: 100%; }
+
+/* two-column login */
+.ancho-login { padding: 0; display: flex; min-height: 100vh; }
+.login-panel { display: flex; flex: 1; min-height: 100vh; }
+.login-izquierda { flex: 1; display: flex; flex-direction: column; background: #fff; padding: 2rem; }
+.login-encabezado { display: flex; align-items: center; gap: .75rem; margin-bottom: auto; padding-bottom: 2rem; }
+.login-cuerpo { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 400px; width: 100%; margin: 0 auto; padding-bottom: 3rem; }
+.login-derecha { width: 420px; flex-shrink: 0; background: var(--azul); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 2rem; }
+.login-logo-grande { width: 160px; height: 160px; object-fit: cover; }
+@media (max-width: 767.98px) {
+  .login-izquierda { padding: 1.5rem; }
+  .login-cuerpo { padding-bottom: 2rem; }
+}
+
+/* sidebar navigation */
+.sidebar-nav { list-style: none; padding: .5rem 0; margin: 0; }
+.sidebar-link { display: flex; align-items: center; gap: .625rem; color: rgba(255,255,255,.75); padding: .45rem 1rem; text-decoration: none; font-size: .875rem; transition: background .15s, padding .2s; white-space: nowrap; overflow: hidden; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); color: #fff; }
+.sidebar-link.activo { background: rgba(255,255,255,.12); color: #fff; border-left: 3px solid #fff; padding-left: calc(1rem - 3px); }
+.sidebar-icon { font-size: 1rem; flex-shrink: 0; width: 1rem; text-align: center; }
+.sidebar-text { overflow: hidden; transition: opacity .15s; }
+.sidebar-separador { font-size: .65rem; text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.4); padding: 1rem 1rem .3rem; white-space: nowrap; overflow: hidden; }
+
+/* icon-only collapsed state — scope to .app-sidebar only, not the offcanvas */
+.autenticado.sidebar-colapsado .app-sidebar .sidebar-link { padding: .45rem; justify-content: center; }
+.autenticado.sidebar-colapsado .app-sidebar .sidebar-link.activo { border-left: none; border-bottom: 2px solid #fff; padding-bottom: calc(.45rem - 2px); }
+.autenticado.sidebar-colapsado .app-sidebar .sidebar-text { display: none; }
+.autenticado.sidebar-colapsado .app-sidebar .sidebar-separador { font-size: 0; height: 1px; padding: 0; margin: .375rem .5rem; background: rgba(255,255,255,.2); }
 .titulo-app { color: var(--azul); }
 
 .btn-primary {
@@ -115,8 +165,9 @@ body { background: var(--fondo); color: var(--texto); }
 /* impresión (Imprimir → Guardar como PDF) */
 .solo-imprimir { display: none; }
 @media print {
-  .barra, .no-imprimir, .alert-dismissible { display: none !important; }
+  .app-header, .app-sidebar, #sidebarOffcanvas, .no-imprimir, .alert-dismissible { display: none !important; }
   .solo-imprimir { display: block; }
+  .app-shell, .app-shell.autenticado, .app-cuerpo, .app-contenido { overflow: visible !important; height: auto !important; }
   body { background: #fff; font-size: 10pt; }
   .table-responsive { overflow: visible; }
   .kpis { grid-template-columns: repeat(5, 1fr); }
